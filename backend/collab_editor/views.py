@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
 import json
 
-from .models import CollabUser, VirtualFile
+from .models import CollabUser, VirtualFile, Room, RoomMember
 
 
 # ============ Auth Views ============
@@ -362,3 +362,240 @@ def file_move_view(request, file_id):
         return JsonResponse({'error': 'A file with this name already exists in the destination'}, status=409)
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+
+# ============ Room Views ============
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def rooms_view(request):
+    """
+    GET: List all rooms the user is a member of.
+    POST: Create a new room.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    if request.method == "GET":
+        # Get rooms where user is a member
+        memberships = RoomMember.objects.filter(user=request.user).select_related('room')
+        rooms = []
+        for membership in memberships:
+            room_data = membership.room.to_dict()
+            room_data['userRole'] = membership.role
+            rooms.append(room_data)
+        return JsonResponse({'rooms': rooms})
+    
+    elif request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            name = data.get('name')
+            password = data.get('password')
+            
+            if not name or not password:
+                return JsonResponse({'error': 'Name and password are required'}, status=400)
+            
+            if len(password) < 4:
+                return JsonResponse({'error': 'Password must be at least 4 characters'}, status=400)
+            
+            # Create room
+            room = Room.objects.create(
+                name=name,
+                code=Room.generate_code(),
+                password_hash=Room.hash_password(password),
+                owner=request.user,
+            )
+            
+            # Add owner as a member with owner role
+            RoomMember.objects.create(
+                room=room,
+                user=request.user,
+                role=RoomMember.OWNER,
+            )
+            
+            # Create default file structure for this room
+            VirtualFile.create_default_structure(str(room.id))
+            
+            room_data = room.to_dict(include_members=True)
+            room_data['userRole'] = RoomMember.OWNER
+            return JsonResponse(room_data, status=201)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "DELETE"])
+def room_detail_view(request, room_id):
+    """
+    GET: Get room details including members.
+    DELETE: Delete a room (owner only).
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        room = Room.objects.get(id=room_id)
+        membership = RoomMember.objects.filter(room=room, user=request.user).first()
+        
+        if not membership:
+            return JsonResponse({'error': 'You are not a member of this room'}, status=403)
+        
+        if request.method == "GET":
+            room_data = room.to_dict(include_members=True)
+            room_data['userRole'] = membership.role
+            return JsonResponse(room_data)
+        
+        elif request.method == "DELETE":
+            if membership.role != RoomMember.OWNER:
+                return JsonResponse({'error': 'Only the owner can delete this room'}, status=403)
+            
+            room.delete()
+            return JsonResponse({'success': True})
+    
+    except Room.DoesNotExist:
+        return JsonResponse({'error': 'Room not found'}, status=404)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def room_join_view(request):
+    """
+    Join a room with code and password.
+    POST body: { "code": "ABC12345", "password": "secret" }
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        data = json.loads(request.body)
+        code = data.get('code', '').upper()
+        password = data.get('password')
+        
+        if not code or not password:
+            return JsonResponse({'error': 'Code and password are required'}, status=400)
+        
+        try:
+            room = Room.objects.get(code=code)
+        except Room.DoesNotExist:
+            return JsonResponse({'error': 'Room not found'}, status=404)
+        
+        if not room.check_password(password):
+            return JsonResponse({'error': 'Invalid password'}, status=401)
+        
+        # Check if already a member
+        existing = RoomMember.objects.filter(room=room, user=request.user).first()
+        if existing:
+            room_data = room.to_dict(include_members=True)
+            room_data['userRole'] = existing.role
+            return JsonResponse(room_data)
+        
+        # Add as editor by default
+        membership = RoomMember.objects.create(
+            room=room,
+            user=request.user,
+            role=RoomMember.EDITOR,
+        )
+        
+        room_data = room.to_dict(include_members=True)
+        room_data['userRole'] = membership.role
+        return JsonResponse(room_data, status=201)
+    
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def room_leave_view(request, room_id):
+    """
+    Leave a room. Owner cannot leave (must delete or transfer ownership).
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        room = Room.objects.get(id=room_id)
+        membership = RoomMember.objects.filter(room=room, user=request.user).first()
+        
+        if not membership:
+            return JsonResponse({'error': 'You are not a member of this room'}, status=403)
+        
+        if membership.role == RoomMember.OWNER:
+            return JsonResponse({'error': 'Owner cannot leave the room. Delete it or transfer ownership.'}, status=400)
+        
+        membership.delete()
+        return JsonResponse({'success': True})
+    
+    except Room.DoesNotExist:
+        return JsonResponse({'error': 'Room not found'}, status=404)
+
+
+@csrf_exempt
+@require_http_methods(["PUT"])
+def room_member_role_view(request, room_id, member_id):
+    """
+    Change a member's role (owner only).
+    PUT body: { "role": "editor" | "viewer" }
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        room = Room.objects.get(id=room_id)
+        user_membership = RoomMember.objects.filter(room=room, user=request.user).first()
+        
+        if not user_membership or user_membership.role != RoomMember.OWNER:
+            return JsonResponse({'error': 'Only the owner can change roles'}, status=403)
+        
+        data = json.loads(request.body)
+        new_role = data.get('role')
+        
+        if new_role not in [RoomMember.EDITOR, RoomMember.VIEWER]:
+            return JsonResponse({'error': 'Invalid role. Use "editor" or "viewer"'}, status=400)
+        
+        target_membership = RoomMember.objects.filter(id=member_id, room=room).first()
+        if not target_membership:
+            return JsonResponse({'error': 'Member not found'}, status=404)
+        
+        if target_membership.role == RoomMember.OWNER:
+            return JsonResponse({'error': 'Cannot change owner role'}, status=400)
+        
+        target_membership.role = new_role
+        target_membership.save(update_fields=['role'])
+        
+        return JsonResponse(target_membership.to_dict())
+    
+    except Room.DoesNotExist:
+        return JsonResponse({'error': 'Room not found'}, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def room_member_kick_view(request, room_id, member_id):
+    """
+    Remove a member from the room (owner only).
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        room = Room.objects.get(id=room_id)
+        user_membership = RoomMember.objects.filter(room=room, user=request.user).first()
+        
+        if not user_membership or user_membership.role != RoomMember.OWNER:
+            return JsonResponse({'error': 'Only the owner can remove members'}, status=403)
+        
+        target_membership = RoomMember.objects.filter(id=member_id, room=room).first()
+        if not target_membership:
+            return JsonResponse({'error': 'Member not found'}, status=404)
+        
+        if target_membership.role == RoomMember.OWNER:
+            return JsonResponse({'error': 'Cannot remove the owner'}, status=400)
+        
+        target_membership.delete()
+        return JsonResponse({'success': True})
+    
+    except Room.DoesNotExist:
+        return JsonResponse({'error': 'Room not found'}, status=404)

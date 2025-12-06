@@ -2,6 +2,35 @@
   <div class="flex flex-col h-screen w-screen">
     <div
       class="flex items-center gap-4 px-4 py-2 bg-[#1e1e1e] border-b border-gray-700 text-gray-400 text-xs font-sans">
+      <!-- Back button -->
+      <button
+        @click="emit('exit-room')"
+        class="flex items-center gap-1 px-2 py-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+        title="Back to rooms">
+        <svg
+          class="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+      </button>
+      <!-- Room name -->
+      <span class="font-medium text-white">{{ room.name }}</span>
+      <span
+        class="px-1.5 py-0.5 text-[10px] uppercase tracking-wider rounded"
+        :class="{
+          'bg-white text-black': room.userRole === 'owner',
+          'bg-gray-700 text-gray-200': room.userRole === 'editor',
+          'bg-gray-800 text-gray-400': room.userRole === 'viewer',
+        }">
+        {{ room.userRole }}
+      </span>
+      <span class="text-gray-600">|</span>
       <span
         class="flex items-center gap-1"
         :class="isConnected ? 'text-green-500' : 'text-gray-400'">
@@ -41,17 +70,27 @@
     </div>
     <div class="flex flex-1 overflow-hidden">
       <!-- File Explorer Sidebar -->
-      <div class="w-64 flex-shrink-0 border-r border-gray-700">
-        <FileExplorer @file-select="handleFileSelect" />
+      <div class="w-64 shrink-0 border-r border-gray-700">
+        <FileExplorer
+          :room-id="room.id"
+          :read-only="isViewer"
+          @file-select="handleFileSelect" />
       </div>
       <!-- Editor -->
-      <div ref="editorContainer" class="flex-1 overflow-hidden relative"></div>
+      <div ref="editorContainer" class="flex-1 overflow-hidden relative">
+        <!-- Read-only overlay for viewers -->
+        <div
+          v-if="isViewer"
+          class="absolute top-2 right-2 z-10 px-2 py-1 bg-gray-800 text-gray-400 text-xs rounded">
+          Read-only mode
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from "vue";
+import { ref, reactive, onMounted, onUnmounted, computed } from "vue";
 import * as monaco from "monaco-editor";
 import * as Y from "yjs";
 import { MonacoBinding } from "y-monaco";
@@ -62,9 +101,13 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  room: {
+    type: Object,
+    required: true,
+  },
 });
 
-const emit = defineEmits(["logout"]);
+const emit = defineEmits(["logout", "exit-room"]);
 
 const editorContainer = ref(null);
 const isConnected = ref(false);
@@ -75,6 +118,10 @@ const currentFile = ref(null);
 const userName = props.user.collab_user?.name || props.user.username;
 const userColor = props.user.collab_user?.color || "#2196f3";
 const clientId = props.user.collab_user?.client_id || String(props.user.id);
+
+// Role-based permissions
+const isViewer = computed(() => props.room.userRole === "viewer");
+const canEdit = computed(() => props.room.userRole !== "viewer");
 
 let editor = null;
 let ydoc = null;
@@ -157,13 +204,12 @@ function handleFileSelect(file) {
       binding = new MonacoBinding(ytext, editor.getModel(), new Set([editor]));
       pendingFileSync = null;
     } else {
-      // Create binding with empty ytext
-      binding = new MonacoBinding(ytext, editor.getModel(), new Set([editor]));
-
+      // Don't create binding yet - wait for server sync to complete
       // Mark that we're waiting for server sync
       pendingFileSync = {
         fileId: file.id,
         fileContent: file.content || "",
+        ytext: ytext, // Store reference for later binding creation
       };
 
       // Request any stored Yjs updates for this file from the server
@@ -456,12 +502,16 @@ onMounted(() => {
     lineNumbers: "on",
     wordWrap: "on",
     scrollBeyondLastLine: false,
+    readOnly: isViewer.value, // Viewers can't edit
   });
 
   // No initial binding - will be created when file is selected
 
   // Listen for Yjs updates and broadcast them
   ydoc.on("update", (update, origin) => {
+    // Viewers don't send updates
+    if (isViewer.value) return;
+
     if (
       origin !== "remote" &&
       ws &&
@@ -522,10 +572,12 @@ onMounted(() => {
 });
 
 function connectWebSocket() {
-  ws = new WebSocket("ws://localhost:8000/ws/collab/");
+  // Connect to room-specific WebSocket
+  const roomId = props.room.id;
+  ws = new WebSocket(`ws://localhost:8000/ws/collab/${roomId}/`);
 
   ws.onopen = () => {
-    console.log("WebSocket connected");
+    console.log(`WebSocket connected to room ${roomId}`);
     isConnected.value = true;
 
     // Request sync from server
@@ -617,13 +669,24 @@ function connectWebSocket() {
         // Server finished sending stored updates for the file
         const fileId = message.fileId;
         if (pendingFileSync && pendingFileSync.fileId === fileId) {
+          const ytext = pendingFileSync.ytext || ydoc.getText(`file-${fileId}`);
+
           if (!message.hasUpdates) {
             // No updates on server - initialize with DB content
-            const ytext = ydoc.getText(`file-${fileId}`);
             if (ytext.length === 0 && pendingFileSync.fileContent) {
               ytext.insert(0, pendingFileSync.fileContent);
             }
           }
+
+          // Now create the binding after sync is complete
+          if (!binding && editor) {
+            binding = new MonacoBinding(
+              ytext,
+              editor.getModel(),
+              new Set([editor])
+            );
+          }
+
           pendingFileSync = null;
         }
       }

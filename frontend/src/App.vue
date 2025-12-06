@@ -3,11 +3,13 @@ import { ref, onMounted } from "vue";
 import CollabEditor from "./components/CollabEditor.vue";
 import LoginForm from "./components/LoginForm.vue";
 import RegisterForm from "./components/RegisterForm.vue";
+import RoomManager from "./components/RoomManager.vue";
 import { Button } from "@/components/ui/button";
 
 const user = ref(null);
 const authView = ref("login"); // 'login' or 'register'
 const loading = ref(true);
+const currentRoom = ref(null); // Currently selected room
 
 // Check if user is already logged in
 async function checkAuth() {
@@ -40,11 +42,20 @@ async function handleLogout() {
       credentials: "include",
     });
     user.value = null;
+    currentRoom.value = null;
     // Clear localStorage client_id on logout
     localStorage.removeItem("swiftly_client_id");
   } catch (e) {
     console.error("Logout failed:", e);
   }
+}
+
+function handleSelectRoom(room) {
+  currentRoom.value = room;
+}
+
+function handleExitRoom() {
+  currentRoom.value = null;
 }
 
 onMounted(() => {
@@ -60,7 +71,18 @@ onMounted(() => {
   </div>
 
   <template v-else-if="user">
-    <CollabEditor :user="user" @logout="handleLogout" />
+    <!-- Show CollabEditor if a room is selected -->
+    <CollabEditor
+      v-if="currentRoom"
+      :user="user"
+      :room="currentRoom"
+      @logout="handleLogout"
+      @exit-room="handleExitRoom" />
+    <!-- Otherwise show RoomManager -->
+    <RoomManager
+      v-else
+      @select-room="handleSelectRoom"
+      @logout="handleLogout" />
   </template>
 
   <div

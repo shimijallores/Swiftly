@@ -9,18 +9,21 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
     """
     WebSocket consumer for Yjs document synchronization.
     Handles JSON messages with base64-encoded Yjs updates.
+    Supports room-based isolation.
     """
     
-    room_group_name = "collab_room"  # Single global room
-    # Store document updates per file (shared across all connections)
-    file_updates = {}  # Dict of fileId -> List of base64 encoded updates
+    # Store Yjs updates per room+file (shared across all connections)
+    # Key: "room_id:file_id" -> list of base64 encoded updates
+    file_updates = {}
     # Store cursor states for all connected users (includes file info)
     cursor_states = {}
+    # Max updates to store before requesting compaction
+    MAX_UPDATES = 100
     
     @database_sync_to_async
-    def load_document_updates(self):
+    def load_document_updates(self, room_id='default'):
         """Load document updates from database."""
-        doc = Document.get_or_create_document()
+        doc = Document.get_or_create_document(room_id)
         if doc.yjs_state:
             # The stored state is a JSON array of base64 updates
             try:
@@ -31,32 +34,36 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
         return []
     
     @database_sync_to_async
-    def save_document_updates(self, updates_list):
+    def save_document_updates(self, updates_list, room_id='default'):
         """Save all document updates to database."""
         try:
-            doc = Document.get_or_create_document()
+            doc = Document.get_or_create_document(room_id)
             # Store as JSON array of base64 updates
             doc.yjs_state = json.dumps(updates_list).encode('utf-8')
             doc.save(update_fields=['yjs_state', 'updated_at'])
-            print(f"Document saved to DB, {len(updates_list)} updates")
+            print(f"Document saved to DB for room {room_id}, {len(updates_list)} updates")
         except Exception as e:
             print(f"Error saving document: {e}")
     
     async def connect(self):
-        # Join the global room group
+        # Get room_id from URL path, default to 'default'
+        self.room_id = self.scope['url_route']['kwargs'].get('room_id', 'default')
+        self.room_group_name = f"collab_room_{self.room_id}"
+        
+        # Join the room-specific group
         await self.channel_layer.group_add(
             self.room_group_name,
             self.channel_name
         )
         await self.accept()
-        print(f"Client connected: {self.channel_name}")
+        print(f"Client connected to room {self.room_id}: {self.channel_name}")
     
     async def disconnect(self, close_code):
         # Remove cursor state for this connection and broadcast removal BEFORE leaving group
         client_id = getattr(self, 'client_id', None)
         if client_id and client_id in YjsSyncConsumer.cursor_states:
             del YjsSyncConsumer.cursor_states[client_id]
-            # Broadcast cursor removal to all clients
+            # Broadcast cursor removal to all clients in the room
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -72,7 +79,7 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             self.channel_name
         )
-        print(f"Client disconnected: {self.channel_name}")
+        print(f"Client disconnected from room {self.room_id}: {self.channel_name}")
     
     async def receive(self, text_data=None, bytes_data=None):
         """
@@ -84,14 +91,21 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
                 msg_type = message.get('type')
                 
                 if msg_type == 'yjs-update':
-                    # Add update to the file-specific list
+                    # Store update for this room+file
                     update_data = message.get('data')
                     file_id = message.get('fileId')
                     
                     if file_id:
-                        if file_id not in YjsSyncConsumer.file_updates:
-                            YjsSyncConsumer.file_updates[file_id] = []
-                        YjsSyncConsumer.file_updates[file_id].append(update_data)
+                        # Use room_id:file_id as key to isolate updates per room
+                        update_key = f"{self.room_id}:{file_id}"
+                        if update_key not in YjsSyncConsumer.file_updates:
+                            YjsSyncConsumer.file_updates[update_key] = []
+                        YjsSyncConsumer.file_updates[update_key].append(update_data)
+                        
+                        # Limit stored updates to prevent memory issues
+                        if len(YjsSyncConsumer.file_updates[update_key]) > YjsSyncConsumer.MAX_UPDATES:
+                            # Keep only the last half of updates
+                            YjsSyncConsumer.file_updates[update_key] = YjsSyncConsumer.file_updates[update_key][-50:]
                     
                     # Broadcast the Yjs update to all clients in the room (with fileId)
                     await self.channel_layer.group_send(
@@ -107,12 +121,14 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
                     # Sync requests are now per-file, handled on frontend
                     pass
                 elif msg_type == 'file-sync-request':
-                    # Send all stored updates for a specific file
+                    # Send stored updates for a specific file in this room
                     file_id = message.get('fileId')
-                    has_updates = file_id and file_id in YjsSyncConsumer.file_updates and len(YjsSyncConsumer.file_updates[file_id]) > 0
+                    update_key = f"{self.room_id}:{file_id}"
+                    has_updates = file_id and update_key in YjsSyncConsumer.file_updates and len(YjsSyncConsumer.file_updates[update_key]) > 0
                     
                     if has_updates:
-                        for update in YjsSyncConsumer.file_updates[file_id]:
+                        # Send all stored updates
+                        for update in YjsSyncConsumer.file_updates[update_key]:
                             await self.send(text_data=json.dumps({
                                 "type": "yjs-state",
                                 "fileId": file_id,

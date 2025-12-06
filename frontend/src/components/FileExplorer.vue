@@ -8,7 +8,7 @@
         class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
         Explorer
       </span>
-      <div class="flex items-center gap-1">
+      <div v-if="!readOnly" class="flex items-center gap-1">
         <button
           @click="showNewFileInput = true"
           class="p-1 hover:bg-gray-700 rounded"
@@ -58,11 +58,28 @@
           </svg>
         </button>
       </div>
+      <button
+        v-else
+        @click="fetchFileTree"
+        class="p-1 hover:bg-gray-700 rounded"
+        title="Refresh">
+        <svg
+          class="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      </button>
     </div>
 
     <!-- New file/folder input at root level -->
     <div
-      v-if="showNewFileInput || showNewFolderInput"
+      v-if="!readOnly && (showNewFileInput || showNewFolderInput)"
       class="px-2 py-1 border-b border-gray-700">
       <input
         ref="newItemInput"
@@ -87,12 +104,14 @@
         :node="node"
         :depth="0"
         :selected-id="selectedId"
+        :can-edit="!readOnly"
+        :room-id="roomId"
         @select="handleSelect"
         @create="handleCreate"
         @rename="handleRename"
         @delete="handleDelete" />
       <div v-if="tree.length === 0" class="px-3 py-2 text-gray-500 text-xs">
-        No files yet. Create one!
+        No files yet.{{ readOnly ? "" : " Create one!" }}
       </div>
     </div>
   </div>
@@ -101,6 +120,17 @@
 <script setup>
 import { ref, onMounted, nextTick, watch } from "vue";
 import FileTreeNode from "./FileTreeNode.vue";
+
+const props = defineProps({
+  roomId: {
+    type: String,
+    required: true,
+  },
+  readOnly: {
+    type: Boolean,
+    default: false,
+  },
+});
 
 const emit = defineEmits(["file-select", "file-change"]);
 
@@ -126,9 +156,12 @@ async function fetchFileTree() {
   try {
     loading.value = true;
     error.value = null;
-    const response = await fetch("http://localhost:8000/api/files/", {
-      credentials: "include",
-    });
+    const response = await fetch(
+      `http://localhost:8000/api/files/?room_id=${props.roomId}`,
+      {
+        credentials: "include",
+      }
+    );
     if (!response.ok) throw new Error("Failed to fetch file tree");
     const data = await response.json();
     tree.value = data.tree;
@@ -179,6 +212,7 @@ async function createNewItem() {
         type: showNewFolderInput.value ? "folder" : "file",
         parentId: null,
         content: showNewFileInput.value ? "" : undefined,
+        room_id: props.roomId,
       }),
     });
 
@@ -213,6 +247,7 @@ async function handleCreate({ parentId, name, type }) {
         type,
         parentId,
         content: type === "file" ? "" : undefined,
+        room_id: props.roomId,
       }),
     });
 

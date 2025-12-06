@@ -1,6 +1,9 @@
 from django.db import models
+from django.contrib.auth.models import User
 import random
 import uuid
+import string
+import hashlib
 
 
 class Document(models.Model):
@@ -162,3 +165,97 @@ class CollabUser(models.Model):
             # Update last_seen
             user.save(update_fields=['last_seen'])
         return user, created
+
+
+class Room(models.Model):
+    """
+    A collaborative room/workspace that users can join.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=8, unique=True, db_index=True)  # Share code
+    password_hash = models.CharField(max_length=128)  # Hashed password
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_rooms')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Room"
+        verbose_name_plural = "Rooms"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+    @staticmethod
+    def generate_code():
+        """Generate a unique 8-character room code."""
+        while True:
+            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            if not Room.objects.filter(code=code).exists():
+                return code
+
+    @staticmethod
+    def hash_password(password):
+        """Hash a password for storage."""
+        return hashlib.sha256(password.encode()).hexdigest()
+
+    def check_password(self, password):
+        """Check if password matches."""
+        return self.password_hash == self.hash_password(password)
+
+    def to_dict(self, include_members=False):
+        """Convert to dictionary for JSON serialization."""
+        data = {
+            'id': str(self.id),
+            'name': self.name,
+            'code': self.code,
+            'ownerId': self.owner.id,
+            'ownerName': self.owner.username,
+            'createdAt': self.created_at.isoformat(),
+            'memberCount': self.members.count(),
+        }
+        if include_members:
+            data['members'] = [
+                member.to_dict() for member in self.members.all()
+            ]
+        return data
+
+
+class RoomMember(models.Model):
+    """
+    Membership of a user in a room with a specific role.
+    """
+    OWNER = 'owner'
+    EDITOR = 'editor'
+    VIEWER = 'viewer'
+    ROLE_CHOICES = [
+        (OWNER, 'Owner'),
+        (EDITOR, 'Editor'),
+        (VIEWER, 'Viewer'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='members')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='room_memberships')
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default=EDITOR)
+    joined_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Room Member"
+        verbose_name_plural = "Room Members"
+        unique_together = ['room', 'user']
+        ordering = ['role', 'joined_at']
+
+    def __str__(self):
+        return f"{self.user.username} in {self.room.name} ({self.role})"
+
+    def to_dict(self):
+        """Convert to dictionary for JSON serialization."""
+        return {
+            'id': str(self.id),
+            'userId': self.user.id,
+            'username': self.user.username,
+            'role': self.role,
+            'joinedAt': self.joined_at.isoformat(),
+        }

@@ -20,4 +20,12 @@ urlpatterns = [
     path('api/files/<uuid:file_id>/rename/', views.file_rename_view, name='file_rename'),
     path('api/files/<uuid:file_id>/delete/', views.file_delete_view, name='file_delete'),
     path('api/files/<uuid:file_id>/move/', views.file_move_view, name='file_move'),
+    
+    # Room endpoints
+    path('api/rooms/', views.rooms_view, name='rooms'),
+    path('api/rooms/join/', views.room_join_view, name='room_join'),
+    path('api/rooms/<uuid:room_id>/', views.room_detail_view, name='room_detail'),
+    path('api/rooms/<uuid:room_id>/leave/', views.room_leave_view, name='room_leave'),
+    path('api/rooms/<uuid:room_id>/members/<uuid:member_id>/role/', views.room_member_role_view, name='room_member_role'),
+    path('api/rooms/<uuid:room_id>/members/<uuid:member_id>/kick/', views.room_member_kick_view, name='room_member_kick'),
 ]
