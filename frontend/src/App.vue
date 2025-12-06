@@ -1,15 +1,15 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import CollabEditor from "./components/CollabEditor.vue";
-import LoginForm from "./components/LoginForm.vue";
-import RegisterForm from "./components/RegisterForm.vue";
-import RoomManager from "./components/RoomManager.vue";
-import { Button } from "@/components/ui/button";
+import AuthPage from "./components/AuthPage.vue";
+import Navbar from "./components/Navbar.vue";
+import HomePage from "./components/HomePage.vue";
+import RoomsPage from "./components/RoomsPage.vue";
 
 const user = ref(null);
-const authView = ref("login"); // 'login' or 'register'
 const loading = ref(true);
-const currentRoom = ref(null); // Currently selected room
+const currentRoom = ref(null);
+const currentPage = ref("home"); // 'home' or 'rooms'
 
 // Check if user is already logged in
 async function checkAuth() {
@@ -27,12 +27,9 @@ async function checkAuth() {
   }
 }
 
-function handleLogin(userData) {
+function handleAuth(userData) {
   user.value = userData;
-}
-
-function handleRegister(userData) {
-  user.value = userData;
+  currentPage.value = "rooms";
 }
 
 async function handleLogout() {
@@ -43,7 +40,7 @@ async function handleLogout() {
     });
     user.value = null;
     currentRoom.value = null;
-    // Clear localStorage client_id on logout
+    currentPage.value = "home";
     localStorage.removeItem("swiftly_client_id");
   } catch (e) {
     console.error("Logout failed:", e);
@@ -58,45 +55,57 @@ function handleExitRoom() {
   currentRoom.value = null;
 }
 
+function handleNavigate(page) {
+  currentPage.value = page;
+}
+
+function goToRooms() {
+  currentPage.value = "rooms";
+}
+
 onMounted(() => {
   checkAuth();
 });
 </script>
 
 <template>
+  <!-- Loading State -->
   <div
     v-if="loading"
-    class="h-screen w-screen flex items-center justify-center bg-[#1e1e1e]">
-    <p class="text-gray-400">Loading...</p>
+    class="h-screen w-screen flex items-center justify-center bg-[#0a0a0a]">
+    <div class="flex items-center gap-3">
+      <img src="/logo.svg" alt="Swiftly" class="h-8 w-8 animate-pulse" />
+      <span class="text-gray-500">Loading...</span>
+    </div>
   </div>
 
+  <!-- Authenticated -->
   <template v-else-if="user">
-    <!-- Show CollabEditor if a room is selected -->
+    <!-- Editor View -->
     <CollabEditor
       v-if="currentRoom"
       :user="user"
       :room="currentRoom"
       @logout="handleLogout"
       @exit-room="handleExitRoom" />
-    <!-- Otherwise show RoomManager -->
-    <RoomManager
-      v-else
-      @select-room="handleSelectRoom"
-      @logout="handleLogout" />
+
+    <!-- Main App -->
+    <template v-else>
+      <Navbar
+        :current-page="currentPage"
+        @navigate="handleNavigate"
+        @logout="handleLogout" />
+
+      <HomePage v-if="currentPage === 'home'" @go-to-rooms="goToRooms" />
+
+      <RoomsPage
+        v-else-if="currentPage === 'rooms'"
+        @select-room="handleSelectRoom" />
+    </template>
   </template>
 
-  <div
-    v-else
-    class="h-screen w-screen flex items-center justify-center bg-[#1e1e1e]">
-    <LoginForm
-      v-if="authView === 'login'"
-      @login="handleLogin"
-      @switch-to-register="authView = 'register'" />
-    <RegisterForm
-      v-else
-      @register="handleRegister"
-      @switch-to-login="authView = 'login'" />
-  </div>
+  <!-- Auth Page -->
+  <AuthPage v-else @login="handleAuth" @register="handleAuth" />
 </template>
 
 <style>

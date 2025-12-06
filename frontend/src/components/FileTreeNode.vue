@@ -58,10 +58,11 @@
       </span>
       <span v-else class="w-4 h-4"></span>
 
-      <!-- Icon based on type -->
-      <span class="w-4 h-4 flex items-center justify-center">
+      <!-- Icon/Label based on type -->
+      <span
+        v-if="node.type === 'folder'"
+        class="w-4 h-4 flex items-center justify-center">
         <svg
-          v-if="node.type === 'folder'"
           class="w-4 h-4"
           :class="isExpanded ? 'text-yellow-400' : 'text-yellow-500'"
           fill="currentColor"
@@ -69,17 +70,12 @@
           <path
             d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
         </svg>
-        <svg
-          v-else
-          class="w-4 h-4"
-          :class="fileIconColor"
-          fill="currentColor"
-          viewBox="0 0 20 20">
-          <path
-            fill-rule="evenodd"
-            d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
-            clip-rule="evenodd" />
-        </svg>
+      </span>
+      <span
+        v-else
+        class="text-[9px] font-bold tracking-tight w-6 text-center shrink-0"
+        :class="fileTypeColor">
+        {{ fileTypeLabel }}
       </span>
 
       <!-- Name -->
@@ -220,6 +216,63 @@ const contextMenuPosition = ref({ x: 0, y: 0 });
 
 const isSelected = computed(() => props.selectedId === props.node.id);
 
+// File type label (uppercase extension)
+const fileTypeLabel = computed(() => {
+  if (props.node.type === "folder") return "";
+  const ext = props.node.name.split(".").pop()?.toLowerCase() || "";
+  const labels = {
+    js: "JS",
+    ts: "TS",
+    vue: "VUE",
+    jsx: "JSX",
+    tsx: "TSX",
+    py: "PY",
+    json: "JSON",
+    md: "MD",
+    html: "HTML",
+    htm: "HTML",
+    css: "CSS",
+    scss: "SCSS",
+    sass: "SASS",
+    less: "LESS",
+    xml: "XML",
+    yaml: "YML",
+    yml: "YML",
+    txt: "TXT",
+    svg: "SVG",
+    png: "IMG",
+    jpg: "IMG",
+    jpeg: "IMG",
+    gif: "IMG",
+    gitignore: "GIT",
+    env: "ENV",
+  };
+  return labels[ext] || ext.toUpperCase().slice(0, 4) || "FILE";
+});
+
+// File type color
+const fileTypeColor = computed(() => {
+  if (props.node.type === "folder") return "";
+  const ext = props.node.name.split(".").pop()?.toLowerCase() || "";
+  const colors = {
+    js: "text-yellow-400",
+    ts: "text-blue-400",
+    vue: "text-green-400",
+    jsx: "text-cyan-400",
+    tsx: "text-blue-400",
+    py: "text-yellow-300",
+    json: "text-yellow-300",
+    md: "text-gray-400",
+    html: "text-orange-400",
+    htm: "text-orange-400",
+    css: "text-blue-400",
+    scss: "text-pink-400",
+    sass: "text-pink-400",
+    less: "text-blue-300",
+  };
+  return colors[ext] || "text-gray-500";
+});
+
 // Context menu items based on node type and permissions
 const contextMenuItems = computed(() => {
   const items = [];
@@ -258,21 +311,6 @@ const contextMenuItems = computed(() => {
   }
 
   return items;
-});
-
-const fileIconColor = computed(() => {
-  const ext = props.node.name.split(".").pop().toLowerCase();
-  const colors = {
-    js: "text-yellow-400",
-    ts: "text-blue-400",
-    vue: "text-green-400",
-    py: "text-blue-300",
-    json: "text-yellow-300",
-    md: "text-gray-400",
-    html: "text-orange-400",
-    css: "text-blue-400",
-  };
-  return colors[ext] || "text-gray-400";
 });
 
 function handleClick() {
