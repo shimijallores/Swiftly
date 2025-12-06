@@ -21,9 +21,8 @@ const emit = defineEmits(["navigate", "go-to-rooms"]);
         </h1>
 
         <p class="text-lg text-gray-400 max-w-xl mx-auto mb-10">
-          A minimalist collaborative code editor. Create rooms, invite your
-          team, and build together with live sync, version history, and instant
-          preview.
+          A web-based collaborative code editor. Create rooms, invite your team,
+          and build together swiftly.
         </p>
 
         <!-- CTA -->
@@ -37,7 +36,7 @@ const emit = defineEmits(["navigate", "go-to-rooms"]);
           <Button
             variant="outline"
             size="lg"
-            class="px-8 border-white/20 text-white hover:bg-white/5">
+            class="px-8 border-white/20 bg-transparent text-white hover:bg-white/5 hover:text-white">
             Learn More
           </Button>
         </div>
@@ -213,7 +212,7 @@ const emit = defineEmits(["navigate", "go-to-rooms"]);
           <span>Swiftly</span>
         </div>
         <p class="text-sm text-gray-600">
-          Built for developers who collaborate
+          Built by yours truly, Shimi Jallores
         </p>
       </div>
     </div>

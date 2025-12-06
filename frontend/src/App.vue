@@ -10,6 +10,7 @@ const user = ref(null);
 const loading = ref(true);
 const currentRoom = ref(null);
 const currentPage = ref("home"); // 'home' or 'rooms'
+const showAuth = ref(false);
 
 // Check if user is already logged in
 async function checkAuth() {
@@ -29,6 +30,7 @@ async function checkAuth() {
 
 function handleAuth(userData) {
   user.value = userData;
+  showAuth.value = false;
   currentPage.value = "rooms";
 }
 
@@ -63,6 +65,18 @@ function goToRooms() {
   currentPage.value = "rooms";
 }
 
+function goToAuth() {
+  showAuth.value = true;
+}
+
+function handleGoToRooms() {
+  if (user.value) {
+    currentPage.value = "rooms";
+  } else {
+    showAuth.value = true;
+  }
+}
+
 onMounted(() => {
   checkAuth();
 });
@@ -79,33 +93,40 @@ onMounted(() => {
     </div>
   </div>
 
-  <!-- Authenticated -->
-  <template v-else-if="user">
-    <!-- Editor View -->
+  <!-- Editor View (requires auth + room) -->
+  <template v-else-if="user && currentRoom">
     <CollabEditor
-      v-if="currentRoom"
       :user="user"
       :room="currentRoom"
       @logout="handleLogout"
       @exit-room="handleExitRoom" />
-
-    <!-- Main App -->
-    <template v-else>
-      <Navbar
-        :current-page="currentPage"
-        @navigate="handleNavigate"
-        @logout="handleLogout" />
-
-      <HomePage v-if="currentPage === 'home'" @go-to-rooms="goToRooms" />
-
-      <RoomsPage
-        v-else-if="currentPage === 'rooms'"
-        @select-room="handleSelectRoom" />
-    </template>
   </template>
 
   <!-- Auth Page -->
-  <AuthPage v-else @login="handleAuth" @register="handleAuth" />
+  <template v-else-if="showAuth">
+    <AuthPage
+      @login="handleAuth"
+      @register="handleAuth"
+      @home="showAuth = false" />
+  </template>
+
+  <!-- Main App (works for both logged in and logged out) -->
+  <template v-else>
+    <Navbar
+      :current-page="currentPage"
+      :user="user"
+      @navigate="handleNavigate"
+      @logout="handleLogout"
+      @login="goToAuth" />
+
+    <div class="h-screen w-screen overflow-auto">
+      <HomePage v-if="currentPage === 'home'" @go-to-rooms="handleGoToRooms" />
+
+      <RoomsPage
+        v-else-if="currentPage === 'rooms' && user"
+        @select-room="handleSelectRoom" />
+    </div>
+  </template>
 </template>
 
 <style>

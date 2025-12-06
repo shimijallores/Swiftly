@@ -125,7 +125,7 @@ class VirtualFile(models.Model):
             room_id=room_id, 
             name='README.md', 
             type=cls.FILE,
-            content='# My Project\n\nWelcome to your swiftly!\n'
+            content='# My Project\n\nWelcome to swiftly!\n'
         )
 
 

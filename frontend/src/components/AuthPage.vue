@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const emit = defineEmits(["login", "register"]);
+const emit = defineEmits(["login", "register", "home"]);
 
 const mode = ref("login"); // 'login' or 'register'
 const loading = ref(false);
@@ -105,12 +105,14 @@ function handleSubmit() {
     <!-- Left side - Branding -->
     <div
       class="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 border-r border-white/5">
-      <div class="flex items-center gap-3">
+      <button
+        @click="emit('home')"
+        class="flex items-center gap-3 hover:opacity-80 transition-opacity">
         <img src="/logo.svg" alt="Swiftly" class="h-8 w-8" />
         <span class="font-semibold text-white text-xl tracking-tight"
           >Swiftly</span
         >
-      </div>
+      </button>
 
       <div class="max-w-md">
         <h1 class="text-4xl font-bold text-white leading-tight mb-4">
@@ -118,23 +120,27 @@ function handleSubmit() {
           <span class="text-gray-500">simplified.</span>
         </h1>
         <p class="text-gray-500 leading-relaxed">
-          Create rooms, invite your team, and build together in real-time. With
-          live cursors, version history, and instant preview.
+          A web-based collaborative code editor. Create rooms, invite your team,
+          and build together swiftly.
         </p>
       </div>
 
-      <p class="text-sm text-gray-600">Built for developers who collaborate</p>
+      <p class="text-sm text-gray-600">Built by yours truly, Shimi Jallores</p>
     </div>
 
     <!-- Right side - Auth Form -->
     <div class="flex-1 flex items-center justify-center p-8">
       <div class="w-full max-w-sm">
-        <!-- Mobile Logo -->
+        <!-- Mobile Logo + Home Link -->
         <div class="lg:hidden flex items-center justify-center gap-2 mb-10">
-          <img src="/logo.svg" alt="Swiftly" class="h-8 w-8" />
-          <span class="font-semibold text-white text-xl tracking-tight"
-            >Swiftly</span
-          >
+          <button
+            @click="emit('home')"
+            class="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <img src="/logo.svg" alt="Swiftly" class="h-8 w-8" />
+            <span class="font-semibold text-white text-xl tracking-tight"
+              >Swiftly</span
+            >
+          </button>
         </div>
 
         <!-- Header -->

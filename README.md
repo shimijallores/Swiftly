@@ -1,58 +1,137 @@
 # Swiftly
 
-Swiftly is a realtime collaborative text editor built for quick scaffolding of MVP's
+A realtime collaborative code editor for teams. Create rooms, invite collaborators, and code together with live sync.
 
-# Initial Setup
+![Vue](https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js)
+![Django](https://img.shields.io/badge/Django-5.2-092E20?logo=django)
+![WebSocket](https://img.shields.io/badge/WebSocket-Channels-blue)
 
-# Backend Setup
+---
+
+## Features
+
+- **Real-time collaboration** — See changes instantly via WebSocket + Yjs CRDT
+- **Team rooms** — Create password-protected rooms with shareable codes
+- **Role-based access** — Owner, Editor, Viewer permissions
+- **Virtual file system** — Organize code in folders and files
+- **Monaco Editor** — VS Code-like editing with IntelliSense & Emmet
+- **Live preview** — Instant HTML preview as you type
+- **Version history** — Auto-saved snapshots with restore capability
+- **Export** — Download entire project as ZIP
+
+---
+
+## How It Works
+
+```
+┌─────────────────┐     WebSocket      ┌─────────────────┐
+│   Vue Frontend  │ ◄─────────────────►│  Django Backend │
+│   Monaco + Yjs  │    Yjs updates     │  Channels ASGI  │
+└─────────────────┘                    └─────────────────┘
+        │                                       │
+        ▼                                       ▼
+   Local CRDT doc                        SQLite Database
+   (conflict-free)                    (files, rooms, users)
+```
+
+1. Users join a **room** with a code + password
+2. Each file has its own **Yjs document** for conflict-free sync
+3. Changes broadcast to all room members via **WebSocket**
+4. Files auto-save to database with **version snapshots**
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.10+
+- Node.js 20.19+ or 22.12+
+
+### 1. Backend Setup
 
 ```bash
-# Navigate to backend directory
 cd backend
 
-# Create virtual environment
+# Create & activate virtual environment
 python -m venv venv
-
-# Activate virtual environment
-# Windows (PowerShell):
-.\venv\Scripts\Activate.ps1
-# Windows (CMD):
-venv\Scripts\activate.bat
-# macOS/Linux:
-source venv/bin/activate
+.\venv\Scripts\Activate.ps1  # Windows PowerShell
+# source venv/bin/activate   # macOS/Linux
 
 # Install dependencies
 pip install django channels daphne django-cors-headers
 
-# Run database migrations
+# Run migrations
 python manage.py migrate
 
-# Start backend server (uses Daphne ASGI automatically)
-python manage.py runserver
+# Start server
+python manage.py runserver  # http://localhost:8000
 ```
 
-#### Frontend Setup
+### 2. Frontend Setup
 
 ```bash
-# Navigate to frontend directory (in a new terminal)
 cd frontend
 
-# Install dependencies (requires Node.js 20.19+ or 22.12+)
+# Install dependencies
 npm install
 
-# Start development server
-npm run dev  # Runs on http://localhost:5173
+# Start dev server
+npm run dev  # http://localhost:5173
 ```
 
-### Running the App (After Initial Setup)
+### 3. Open App
 
-```bash
-# Terminal 1 - Backend (from /backend directory)
-.\venv\Scripts\Activate.ps1  # Activate venv first
-python manage.py runserver   # Runs on http://localhost:8000
+Visit **http://localhost:5173** — Register, create a room, and start coding!
 
-# Terminal 2 - Frontend (from /frontend directory)
-npm run dev  # Runs on http://localhost:5173
+---
+
+## Project Structure
+
+```
+Swiftly/
+├── backend/
+│   ├── collab_editor/
+│   │   ├── models.py      # Room, VirtualFile, FileSnapshot
+│   │   ├── views.py       # REST API endpoints
+│   │   ├── consumers.py   # WebSocket handler (Yjs sync)
+│   │   └── urls.py        # API routes
+│   └── backend/
+│       └── settings.py    # Django config
+│
+└── frontend/
+    └── src/
+        ├── components/
+        │   ├── CollabEditor.vue   # Main editor
+        │   ├── FileExplorer.vue   # File tree sidebar
+        │   └── VersionHistory.vue # Snapshot panel
+        └── App.vue                # Root component
 ```
 
-Open http://localhost:5173 in your browser to use the app.
+---
+
+## API Endpoints
+
+| Endpoint                | Method   | Description         |
+| ----------------------- | -------- | ------------------- |
+| `/api/auth/register/`   | POST     | Create account      |
+| `/api/auth/login/`      | POST     | Login               |
+| `/api/rooms/`           | GET/POST | List/create rooms   |
+| `/api/rooms/<id>/join/` | POST     | Join room with code |
+| `/api/files/`           | GET      | Get file tree       |
+| `/api/files/<id>/`      | PUT      | Update file content |
+| `/api/snapshots/`       | GET      | Get version history |
+
+---
+
+## Tech Stack
+
+**Frontend:** Vue 3, Vite, Monaco Editor, Yjs, y-monaco, TailwindCSS, shadcn/vue
+
+**Backend:** Django 5.2, Django Channels, Daphne (ASGI), SQLite
+
+---
+
+## License
+
+MIT

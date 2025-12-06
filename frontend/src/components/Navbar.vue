@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from "vue";
 import { Button } from "@/components/ui/button";
 
 const props = defineProps({
@@ -6,9 +7,22 @@ const props = defineProps({
     type: String,
     default: "home",
   },
+  user: {
+    type: Object,
+    default: null,
+  },
 });
 
-const emit = defineEmits(["navigate", "logout"]);
+const emit = defineEmits(["navigate", "logout", "login"]);
+
+const userName = computed(() => {
+  if (!props.user) return null;
+  return props.user.collab_user?.name || props.user.username;
+});
+
+const userColor = computed(() => {
+  return props.user?.collab_user?.color || "#3b82f6";
+});
 </script>
 
 <template>
@@ -27,8 +41,8 @@ const emit = defineEmits(["navigate", "logout"]);
             >
           </button>
 
-          <!-- Nav Links -->
-          <div class="flex items-center gap-1">
+          <!-- Nav Links (only show full nav when logged in) -->
+          <div v-if="user" class="flex items-center gap-1">
             <button
               @click="emit('navigate', 'home')"
               class="px-3 py-1.5 text-sm rounded-md transition-colors"
@@ -57,13 +71,50 @@ const emit = defineEmits(["navigate", "logout"]);
         </div>
 
         <!-- User Actions -->
-        <Button
-          variant="ghost"
-          size="sm"
-          class="text-gray-400 hover:text-white"
-          @click="emit('logout')">
-          Logout
-        </Button>
+        <div class="flex items-center gap-3">
+          <!-- Logged In: Show welcome message + logout -->
+          <template v-if="user">
+            <span class="text-sm text-gray-400">
+              Welcome back, <span class="text-white">{{ userName }}</span>
+            </span>
+            <div class="w-px h-4 bg-white/10"></div>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="text-gray-400 hover:text-white flex items-center gap-1.5"
+              @click="emit('logout')">
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Logout
+            </Button>
+          </template>
+
+          <!-- Logged Out: Show login + get started -->
+          <template v-else>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="text-gray-400 hover:text-white"
+              @click="emit('login')">
+              Log in
+            </Button>
+            <Button
+              size="sm"
+              class="bg-white text-black hover:bg-gray-200"
+              @click="emit('login')">
+              Get Started
+            </Button>
+          </template>
+        </div>
       </div>
     </div>
   </nav>
