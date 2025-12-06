@@ -7,7 +7,11 @@
         :class="isConnected ? 'text-green-500' : 'text-gray-400'">
         {{ isConnected ? "● Connected" : "○ Disconnected" }}
       </span>
-      <span class="text-blue-400">{{ userName }}</span>
+      <span
+        class="px-2 py-0.5 rounded text-white text-xs"
+        :style="{ backgroundColor: userColor }">
+        {{ userName }}
+      </span>
       <span v-if="typingCount > 0" class="text-orange-400 italic">
         {{ typingCount }} user{{ typingCount > 1 ? "s" : "" }} typing...
       </span>
@@ -19,6 +23,11 @@
           :style="{ backgroundColor: cursor.color }">
           {{ cursor.name }}
         </span>
+        <button
+          @click="emit('logout')"
+          class="px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors">
+          Logout
+        </button>
       </div>
     </div>
     <div ref="editorContainer" class="flex-1 overflow-hidden relative"></div>
@@ -31,9 +40,23 @@ import * as monaco from "monaco-editor";
 import * as Y from "yjs";
 import { MonacoBinding } from "y-monaco";
 
+const props = defineProps({
+  user: {
+    type: Object,
+    required: true,
+  },
+});
+
+const emit = defineEmits(["logout"]);
+
 const editorContainer = ref(null);
 const isConnected = ref(false);
 const typingCount = ref(0);
+
+// Use user data from props
+const userName = props.user.collab_user?.name || props.user.username;
+const userColor = props.user.collab_user?.color || "#2196f3";
+const clientId = props.user.collab_user?.client_id || String(props.user.id);
 
 let editor = null;
 let ydoc = null;
@@ -41,15 +64,6 @@ let ws = null;
 let binding = null;
 let typingTimeout = null;
 let cursorUpdateTimeout = null;
-
-// Generate a unique client ID and random user name
-const clientId = Math.random().toString(36).substring(2, 15);
-const userNames = ["Alice", "Bob", "Charlie", "Diana", "Eve", "Frank", "Grace", "Henry", "Ivy", "Jack"];
-const userName = userNames[Math.floor(Math.random() * userNames.length)] + Math.floor(Math.random() * 100);
-
-// Generate a random color for this user
-const userColors = ["#e91e63", "#9c27b0", "#673ab7", "#3f51b5", "#2196f3", "#00bcd4", "#009688", "#4caf50", "#ff9800", "#ff5722"];
-const userColor = userColors[Math.floor(Math.random() * userColors.length)];
 
 // Track remote users' typing states
 const remoteTypingStates = new Map();
@@ -80,20 +94,24 @@ function broadcastCursor() {
         clientId: clientId,
         name: userName,
         color: userColor,
-        position: position ? { lineNumber: position.lineNumber, column: position.column } : null,
-        selection: selection ? {
-          startLineNumber: selection.startLineNumber,
-          startColumn: selection.startColumn,
-          endLineNumber: selection.endLineNumber,
-          endColumn: selection.endColumn,
-        } : null,
+        position: position
+          ? { lineNumber: position.lineNumber, column: position.column }
+          : null,
+        selection: selection
+          ? {
+              startLineNumber: selection.startLineNumber,
+              startColumn: selection.startColumn,
+              endLineNumber: selection.endLineNumber,
+              endColumn: selection.endColumn,
+            }
+          : null,
       })
     );
   }
 }
 
 function updateRemoteCursor(remoteClientId, cursorData) {
-  if (!editor || !cursorData || remoteClientId === clientId) return;
+  if (!editor || remoteClientId === clientId) return;
 
   // Remove cursor if null (user disconnected)
   if (cursorData === null) {
@@ -104,8 +122,13 @@ function updateRemoteCursor(remoteClientId, cursorData) {
     cursorDecorations.delete(remoteClientId);
     // Remove cursor widget
     removeCursorWidget(remoteClientId);
+    // Remove typing state
+    remoteTypingStates.delete(remoteClientId);
+    updateTypingCount();
     return;
   }
+
+  if (!cursorData) return;
 
   // Update cursor state
   remoteCursors[remoteClientId] = cursorData;
@@ -117,7 +140,11 @@ function updateRemoteCursor(remoteClientId, cursorData) {
   const decorations = [];
 
   // Add selection decoration if there's a selection
-  if (selection && (selection.startLineNumber !== selection.endLineNumber || selection.startColumn !== selection.endColumn)) {
+  if (
+    selection &&
+    (selection.startLineNumber !== selection.endLineNumber ||
+      selection.startColumn !== selection.endColumn)
+  ) {
     decorations.push({
       range: new monaco.Range(
         selection.startLineNumber,
