@@ -94,6 +94,7 @@ import { ref, reactive, onMounted, onUnmounted, computed } from "vue";
 import * as monaco from "monaco-editor";
 import * as Y from "yjs";
 import { MonacoBinding } from "y-monaco";
+import { emmetHTML, emmetCSS, emmetJSX } from "emmet-monaco-es";
 import FileExplorer from "./FileExplorer.vue";
 
 const props = defineProps({
@@ -491,7 +492,7 @@ onMounted(() => {
   // Connect to Django WebSocket
   connectWebSocket();
 
-  // Initialize Monaco Editor
+  // Initialize Monaco Editor with enhanced features
   editor = monaco.editor.create(editorContainer.value, {
     value: "",
     language: "javascript",
@@ -502,8 +503,38 @@ onMounted(() => {
     lineNumbers: "on",
     wordWrap: "on",
     scrollBeyondLastLine: false,
-    readOnly: isViewer.value, // Viewers can't edit
+    readOnly: isViewer.value,
+    // IntelliSense settings
+    quickSuggestions: {
+      other: true,
+      comments: true,
+      strings: true,
+    },
+    suggestOnTriggerCharacters: true,
+    acceptSuggestionOnEnter: "on",
+    tabCompletion: "on",
+    wordBasedSuggestions: "currentDocument",
+    parameterHints: { enabled: true },
+    formatOnType: true,
+    formatOnPaste: true,
+    // Bracket matching
+    bracketPairColorization: { enabled: true },
+    autoClosingBrackets: "always",
+    autoClosingQuotes: "always",
+    autoSurround: "languageDefined",
+    // Code folding
+    folding: true,
+    foldingStrategy: "indentation",
+    // Other enhancements
+    linkedEditing: true,
+    renderWhitespace: "selection",
+    smoothScrolling: true,
   });
+
+  // Enable Emmet for HTML, CSS, and JSX
+  emmetHTML(monaco);
+  emmetCSS(monaco);
+  emmetJSX(monaco);
 
   // No initial binding - will be created when file is selected
 
