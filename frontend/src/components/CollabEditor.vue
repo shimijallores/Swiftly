@@ -72,12 +72,16 @@
       <!-- File Explorer Sidebar -->
       <div class="w-64 shrink-0 border-r border-gray-700">
         <FileExplorer
+          ref="fileExplorerRef"
           :room-id="room.id"
           :read-only="isViewer"
           @file-select="handleFileSelect" />
       </div>
       <!-- Editor -->
-      <div ref="editorContainer" class="flex-1 overflow-hidden relative">
+      <div
+        ref="editorContainer"
+        class="overflow-hidden relative"
+        :class="showPreview ? 'w-1/2' : 'flex-1'">
         <!-- Read-only overlay for viewers -->
         <div
           v-if="isViewer"
@@ -85,6 +89,84 @@
           Read-only mode
         </div>
       </div>
+      <!-- Live Preview Panel -->
+      <div
+        v-if="showPreview"
+        class="w-1/2 flex flex-col border-l border-gray-700 bg-white">
+        <!-- Preview Header -->
+        <div
+          class="flex items-center justify-between px-3 py-2 bg-[#1e1e1e] border-b border-gray-700">
+          <div class="flex items-center gap-2">
+            <span class="text-gray-400 text-xs">Live Preview</span>
+            <button
+              @click="refreshPreview"
+              class="p-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+              title="Refresh Preview">
+              <svg
+                class="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          </div>
+          <button
+            @click="showPreview = false"
+            class="p-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+            title="Close Preview">
+            <svg
+              class="w-3.5 h-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <!-- Preview iframe -->
+        <iframe
+          ref="previewFrame"
+          class="flex-1 w-full bg-white"
+          sandbox="allow-scripts allow-same-origin"
+          title="Live Preview">
+        </iframe>
+      </div>
+      <!-- Preview Toggle Button (shows when preview is hidden and file is previewable) -->
+      <button
+        v-if="!showPreview && isPreviewable"
+        @click="
+          showPreview = true;
+          updatePreview();
+        "
+        class="absolute right-4 bottom-4 flex items-center gap-2 px-3 py-2 bg-[#2d2d2d] text-gray-300 hover:bg-[#3d3d3d] rounded-lg shadow-lg border border-gray-600 z-20"
+        title="Open Live Preview">
+        <svg
+          class="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+        </svg>
+        <span class="text-xs">Preview</span>
+      </button>
     </div>
   </div>
 </template>
@@ -111,9 +193,12 @@ const props = defineProps({
 const emit = defineEmits(["logout", "exit-room"]);
 
 const editorContainer = ref(null);
+const previewFrame = ref(null);
+const fileExplorerRef = ref(null);
 const isConnected = ref(false);
 const typingCount = ref(0);
 const currentFile = ref(null);
+const showPreview = ref(false);
 
 // Use user data from props
 const userName = props.user.collab_user?.name || props.user.username;
@@ -132,6 +217,14 @@ let typingTimeout = null;
 let cursorUpdateTimeout = null;
 let saveTimeout = null;
 let currentFileId = null; // Track current file for per-file sync
+let previewUpdateTimeout = null; // Debounce preview updates
+
+// Check if current file is previewable (HTML)
+const isPreviewable = computed(() => {
+  if (!currentFile.value) return false;
+  const ext = currentFile.value.path?.split(".").pop()?.toLowerCase();
+  return ext === "html" || ext === "htm";
+});
 
 // Track remote users' typing states
 const remoteTypingStates = new Map();
@@ -278,6 +371,203 @@ function debouncedSave() {
   saveTimeout = setTimeout(() => {
     saveFileContent();
   }, 2000);
+}
+
+// Update live preview with current HTML content
+async function updatePreview() {
+  if (!showPreview.value || !previewFrame.value || !editor) return;
+
+  const currentPath = currentFile.value?.path;
+  if (!currentPath) return;
+
+  const ext = currentPath.split(".").pop()?.toLowerCase();
+  if (ext !== "html" && ext !== "htm") return;
+
+  let htmlContent = editor.getValue();
+
+  // Try to resolve linked CSS and JS files from the same project
+  htmlContent = await resolveLinkedFiles(htmlContent);
+
+  // Write to iframe
+  const iframe = previewFrame.value;
+  const doc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (doc) {
+    doc.open();
+    doc.write(htmlContent);
+    doc.close();
+  }
+}
+
+// Resolve linked CSS and JS files by fetching their content
+async function resolveLinkedFiles(htmlContent) {
+  // Get all files in the project for lookup
+  const allFiles = await getAllProjectFiles();
+
+  // Process <link> tags for CSS
+  htmlContent = await processLinkTags(htmlContent, allFiles);
+
+  // Process <script src="..."> tags for JS
+  htmlContent = await processScriptTags(htmlContent, allFiles);
+
+  return htmlContent;
+}
+
+// Get all files from the file explorer
+async function getAllProjectFiles() {
+  try {
+    const response = await fetch(
+      `http://localhost:8000/api/files/?room_id=${props.room.id}`,
+      { credentials: "include" }
+    );
+    if (!response.ok) return [];
+    const data = await response.json();
+
+    // Flatten the tree to get all files
+    const files = [];
+    function flattenTree(nodes, parentPath = "") {
+      for (const node of nodes) {
+        const nodePath = parentPath ? `${parentPath}/${node.name}` : node.name;
+        if (node.type === "file") {
+          files.push({ ...node, fullPath: nodePath });
+        }
+        if (node.children) {
+          flattenTree(node.children, nodePath);
+        }
+      }
+    }
+    flattenTree(data.tree || []);
+    return files;
+  } catch (e) {
+    console.error("Error fetching project files:", e);
+    return [];
+  }
+}
+
+// Fetch file content by ID
+async function fetchFileContent(fileId) {
+  try {
+    const response = await fetch(
+      `http://localhost:8000/api/files/content/?id=${fileId}`,
+      { credentials: "include" }
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.content;
+  } catch (e) {
+    console.error("Error fetching file content:", e);
+    return null;
+  }
+}
+
+// Find a file by its path/name in the project files
+function findFileByPath(files, href) {
+  // Remove leading ./ or /
+  const cleanHref = href.replace(/^\.?\//, "");
+
+  // Try exact match first
+  let file = files.find(
+    (f) => f.fullPath === cleanHref || f.name === cleanHref
+  );
+
+  // Try matching just the filename
+  if (!file) {
+    const fileName = cleanHref.split("/").pop();
+    file = files.find((f) => f.name === fileName);
+  }
+
+  return file;
+}
+
+// Process <link> tags and inline CSS
+async function processLinkTags(html, allFiles) {
+  const linkRegex =
+    /<link[^>]+rel=["']stylesheet["'][^>]+href=["']([^"']+)["'][^>]*>/gi;
+  const linkRegex2 =
+    /<link[^>]+href=["']([^"']+)["'][^>]+rel=["']stylesheet["'][^>]*>/gi;
+
+  const matches = [...html.matchAll(linkRegex), ...html.matchAll(linkRegex2)];
+
+  for (const match of matches) {
+    const href = match[1];
+    // Skip external URLs
+    if (
+      href.startsWith("http://") ||
+      href.startsWith("https://") ||
+      href.startsWith("//")
+    ) {
+      continue;
+    }
+
+    const file = findFileByPath(allFiles, href);
+    if (file) {
+      const content = await fetchFileContent(file.id);
+      if (content) {
+        // Replace link tag with inline style
+        html = html.replace(
+          match[0],
+          `<style>/* ${href} */\n${content}\n</style>`
+        );
+      }
+    }
+  }
+
+  return html;
+}
+
+// Process <script src="..."> tags and inline JS
+async function processScriptTags(html, allFiles) {
+  const scriptRegex = /<script[^>]+src=["']([^"']+)["'][^>]*><\/script>/gi;
+
+  const matches = [...html.matchAll(scriptRegex)];
+
+  for (const match of matches) {
+    const src = match[1];
+    // Skip external URLs
+    if (
+      src.startsWith("http://") ||
+      src.startsWith("https://") ||
+      src.startsWith("//")
+    ) {
+      continue;
+    }
+
+    const file = findFileByPath(allFiles, src);
+    if (file) {
+      const content = await fetchFileContent(file.id);
+      if (content) {
+        // Replace script tag with inline script
+        const scriptOpen = "<scr" + "ipt>";
+        const scriptClose = "</scr" + "ipt>";
+        const replacement =
+          scriptOpen +
+          "/* " +
+          src +
+          " */" +
+          String.fromCharCode(10) +
+          content +
+          String.fromCharCode(10) +
+          scriptClose;
+        html = html.replace(match[0], replacement);
+      }
+    }
+  }
+
+  return html;
+}
+
+// Debounced preview update
+function debouncedPreviewUpdate() {
+  if (previewUpdateTimeout) {
+    clearTimeout(previewUpdateTimeout);
+  }
+  previewUpdateTimeout = setTimeout(() => {
+    updatePreview();
+  }, 500);
+}
+
+// Manual refresh preview
+function refreshPreview() {
+  updatePreview();
 }
 
 function broadcastAwareness(isTyping) {
@@ -568,6 +858,11 @@ onMounted(() => {
     // Trigger debounced save
     debouncedSave();
 
+    // Update live preview if showing
+    if (showPreview.value && isPreviewable.value) {
+      debouncedPreviewUpdate();
+    }
+
     if (typingTimeout) {
       clearTimeout(typingTimeout);
     }
@@ -735,6 +1030,7 @@ onUnmounted(() => {
   if (typingTimeout) clearTimeout(typingTimeout);
   if (cursorUpdateTimeout) clearTimeout(cursorUpdateTimeout);
   if (saveTimeout) clearTimeout(saveTimeout);
+  if (previewUpdateTimeout) clearTimeout(previewUpdateTimeout);
   // Clean up cursor widgets and styles
   for (const id of cursorWidgets.keys()) {
     removeCursorWidget(id);
