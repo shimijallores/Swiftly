@@ -20,14 +20,14 @@
         @keyup.enter="submitRename"
         @keyup.escape="cancelRename"
         @blur="cancelRename"
-        class="flex-1 bg-[#3c3c3c] border border-blue-500 text-white text-xs px-1 py-0.5 rounded outline-none" />
+        class="flex-1 bg-white/5 border border-white/10 focus:border-white/20 text-white text-xs px-1.5 py-0.5 rounded-md outline-none transition-colors" />
     </div>
 
     <!-- Normal display mode -->
     <div
       v-else
-      class="group flex items-center gap-1 px-2 py-0.5 cursor-pointer hover:bg-[#2a2d2e] transition-colors"
-      :class="{ 'bg-[#094771]': isSelected }"
+      class="group flex items-center gap-1 px-2 py-0.5 cursor-pointer hover:bg-white/5 transition-colors"
+      :class="{ 'bg-white/10': isSelected }"
       :style="{ paddingLeft: `${depth * 12 + 8}px` }"
       @click="handleClick"
       @contextmenu.prevent="showContextMenu">
@@ -37,7 +37,7 @@
         class="w-4 h-4 flex items-center justify-center">
         <svg
           v-if="isExpanded"
-          class="w-3 h-3 text-gray-400"
+          class="w-3 h-3 text-white/40"
           fill="currentColor"
           viewBox="0 0 20 20">
           <path
@@ -47,7 +47,7 @@
         </svg>
         <svg
           v-else
-          class="w-3 h-3 text-gray-400"
+          class="w-3 h-3 text-white/40"
           fill="currentColor"
           viewBox="0 0 20 20">
           <path
@@ -64,7 +64,7 @@
         class="w-4 h-4 flex items-center justify-center">
         <svg
           class="w-4 h-4"
-          :class="isExpanded ? 'text-yellow-400' : 'text-yellow-500'"
+          :class="isExpanded ? 'text-amber-400/80' : 'text-amber-500/70'"
           fill="currentColor"
           viewBox="0 0 20 20">
           <path
@@ -79,14 +79,14 @@
       </span>
 
       <!-- Name -->
-      <span class="truncate flex-1">{{ node.name }}</span>
+      <span class="truncate flex-1 text-white/70">{{ node.name }}</span>
 
       <!-- Action buttons (show on hover, only for editors) -->
       <div v-if="canEdit" class="hidden group-hover:flex items-center gap-0.5">
         <button
           v-if="node.type === 'folder'"
           @click.stop="startCreateFile"
-          class="p-0.5 hover:bg-gray-600 rounded"
+          class="p-0.5 hover:bg-white/10 rounded text-white/40 hover:text-white/70 transition-colors"
           title="New File">
           <svg
             class="w-3 h-3"
@@ -102,7 +102,7 @@
         </button>
         <button
           @click.stop="startRename"
-          class="p-0.5 hover:bg-gray-600 rounded"
+          class="p-0.5 hover:bg-white/10 rounded text-white/40 hover:text-white/70 transition-colors"
           title="Rename">
           <svg
             class="w-3 h-3"
@@ -118,7 +118,7 @@
         </button>
         <button
           @click.stop="handleDelete"
-          class="p-0.5 hover:bg-red-600 rounded"
+          class="p-0.5 hover:bg-red-500/20 rounded text-white/40 hover:text-red-400 transition-colors"
           title="Delete">
           <svg
             class="w-3 h-3"
@@ -148,7 +148,7 @@
         @keyup.enter="submitCreate"
         @keyup.escape="cancelCreate"
         @blur="cancelCreate"
-        class="flex-1 bg-[#3c3c3c] border border-blue-500 text-white text-xs px-1 py-0.5 rounded outline-none"
+        class="flex-1 bg-white/5 border border-white/10 focus:border-white/20 text-white text-xs px-1.5 py-0.5 rounded-md outline-none transition-colors"
         :placeholder="
           createItemType === 'folder' ? 'folder name' : 'filename.js'
         " />

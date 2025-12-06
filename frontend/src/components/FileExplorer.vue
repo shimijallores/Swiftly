@@ -1,20 +1,19 @@
 <template>
   <div
-    class="file-explorer h-full bg-[#252526] text-gray-300 text-sm overflow-auto flex flex-col">
+    class="file-explorer h-full bg-[#0a0a0a] text-gray-300 text-sm overflow-auto flex flex-col">
     <!-- Header with actions -->
     <div
-      class="flex items-center justify-between px-3 py-2 border-b border-gray-700">
-      <span
-        class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+      class="flex items-center justify-between px-3 py-2.5 border-b border-white/5">
+      <span class="text-xs font-medium text-white/50 uppercase tracking-wider">
         Explorer
       </span>
-      <div v-if="!readOnly" class="flex items-center gap-1">
+      <div v-if="!readOnly" class="flex items-center gap-0.5">
         <button
           @click="showNewFileInput = true"
-          class="p-1 hover:bg-gray-700 rounded"
+          class="p-1.5 hover:bg-white/5 rounded-md text-white/40 hover:text-white/70 transition-colors"
           title="New File">
           <svg
-            class="w-4 h-4"
+            class="w-3.5 h-3.5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24">
@@ -27,10 +26,10 @@
         </button>
         <button
           @click="showNewFolderInput = true"
-          class="p-1 hover:bg-gray-700 rounded"
+          class="p-1.5 hover:bg-white/5 rounded-md text-white/40 hover:text-white/70 transition-colors"
           title="New Folder">
           <svg
-            class="w-4 h-4"
+            class="w-3.5 h-3.5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24">
@@ -43,10 +42,10 @@
         </button>
         <button
           @click="fetchFileTree"
-          class="p-1 hover:bg-gray-700 rounded"
+          class="p-1.5 hover:bg-white/5 rounded-md text-white/40 hover:text-white/70 transition-colors"
           title="Refresh">
           <svg
-            class="w-4 h-4"
+            class="w-3.5 h-3.5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24">
@@ -61,10 +60,10 @@
       <button
         v-else
         @click="fetchFileTree"
-        class="p-1 hover:bg-gray-700 rounded"
+        class="p-1.5 hover:bg-white/5 rounded-md text-white/40 hover:text-white/70 transition-colors"
         title="Refresh">
         <svg
-          class="w-4 h-4"
+          class="w-3.5 h-3.5"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24">
@@ -80,21 +79,21 @@
     <!-- New file/folder input at root level -->
     <div
       v-if="!readOnly && (showNewFileInput || showNewFolderInput)"
-      class="px-2 py-1 border-b border-gray-700">
+      class="px-2 py-1.5 border-b border-white/5">
       <input
         ref="newItemInput"
         v-model="newItemName"
         @keyup.enter="createNewItem"
         @keyup.escape="cancelNewItem"
         @blur="cancelNewItem"
-        class="w-full bg-[#3c3c3c] border border-blue-500 text-white text-xs px-2 py-1 rounded outline-none"
+        class="w-full bg-white/5 border border-white/10 focus:border-white/20 text-white text-xs px-2.5 py-1.5 rounded-md outline-none placeholder-white/30 transition-colors"
         :placeholder="showNewFileInput ? 'filename.js' : 'folder name'"
         autofocus />
     </div>
 
     <!-- Loading/Error states -->
-    <div v-if="loading" class="p-3 text-gray-500">Loading...</div>
-    <div v-else-if="error" class="p-3 text-red-400">{{ error }}</div>
+    <div v-if="loading" class="p-3 text-white/30 text-xs">Loading...</div>
+    <div v-else-if="error" class="p-3 text-red-400/80 text-xs">{{ error }}</div>
 
     <!-- File tree -->
     <div v-else class="py-1 flex-1 overflow-auto">
@@ -110,7 +109,7 @@
         @create="handleCreate"
         @rename="handleRename"
         @delete="handleDelete" />
-      <div v-if="tree.length === 0" class="px-3 py-2 text-gray-500 text-xs">
+      <div v-if="tree.length === 0" class="px-3 py-2 text-white/30 text-xs">
         No files yet.{{ readOnly ? "" : " Create one!" }}
       </div>
     </div>

@@ -1,11 +1,11 @@
 <template>
-  <div class="flex flex-col h-full bg-[#1e1e1e] text-gray-300">
+  <div class="flex flex-col h-full bg-[#0a0a0a] text-gray-300">
     <!-- Header -->
     <div
-      class="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+      class="flex items-center justify-between px-4 py-3 border-b border-white/5">
       <div class="flex items-center gap-2">
         <svg
-          class="w-5 h-5 text-gray-400"
+          class="w-4 h-4 text-white/40"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24">
@@ -15,11 +15,11 @@
             stroke-width="2"
             d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <h2 class="text-sm font-medium text-white">Version history</h2>
+        <h2 class="text-sm font-medium text-white/90">Version history</h2>
       </div>
       <button
         @click="emit('close')"
-        class="p-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+        class="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-md transition-colors"
         title="Close">
         <svg
           class="w-4 h-4"
@@ -38,14 +38,14 @@
     <!-- Current file info -->
     <div
       v-if="currentFile"
-      class="px-4 py-2 border-b border-gray-700 bg-[#252526]">
-      <p class="text-xs text-gray-400">{{ currentFile.path }}</p>
+      class="px-4 py-2 border-b border-white/5 bg-white/2">
+      <p class="text-xs text-white/40">{{ currentFile.path }}</p>
     </div>
 
     <!-- Loading state -->
     <div v-if="isLoading" class="flex items-center justify-center py-8">
       <svg
-        class="w-6 h-6 animate-spin text-gray-400"
+        class="w-5 h-5 animate-spin text-white/30"
         fill="none"
         viewBox="0 0 24 24">
         <circle
@@ -67,7 +67,7 @@
       v-else-if="!currentFile"
       class="flex flex-col items-center justify-center py-12 px-4 text-center">
       <svg
-        class="w-12 h-12 text-gray-600 mb-3"
+        class="w-10 h-10 text-white/10 mb-3"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24">
@@ -77,7 +77,7 @@
           stroke-width="1.5"
           d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
-      <p class="text-sm text-gray-500">
+      <p class="text-sm text-white/40">
         Select a file to view its version history
       </p>
     </div>
@@ -87,7 +87,7 @@
       v-else-if="snapshots.length === 0"
       class="flex flex-col items-center justify-center py-12 px-4 text-center">
       <svg
-        class="w-12 h-12 text-gray-600 mb-3"
+        class="w-10 h-10 text-white/10 mb-3"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24">
@@ -97,8 +97,8 @@
           stroke-width="1.5"
           d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <p class="text-sm text-gray-500">No version history yet</p>
-      <p class="text-xs text-gray-600 mt-1">
+      <p class="text-sm text-white/40">No version history yet</p>
+      <p class="text-xs text-white/20 mt-1">
         Versions are saved automatically as you edit
       </p>
     </div>
@@ -109,10 +109,10 @@
       <div
         v-for="(group, date) in groupedSnapshots"
         :key="date"
-        class="border-b border-gray-800">
+        class="border-b border-white/5">
         <!-- Date header -->
         <div
-          class="sticky top-0 px-4 py-2 bg-[#252526] text-xs font-medium text-gray-400 uppercase tracking-wider">
+          class="sticky top-0 px-4 py-2 bg-white/2 text-xs font-medium text-white/40 uppercase tracking-wider">
           {{ formatDateHeader(date) }}
         </div>
 
@@ -122,16 +122,16 @@
             v-for="snapshot in group"
             :key="snapshot.id"
             @click="selectSnapshot(snapshot)"
-            class="w-full px-4 py-3 text-left hover:bg-[#2a2d2e] transition-colors"
-            :class="{ 'bg-[#37373d]': selectedSnapshot?.id === snapshot.id }">
+            class="w-full px-4 py-3 text-left hover:bg-white/5 transition-colors"
+            :class="{ 'bg-white/10': selectedSnapshot?.id === snapshot.id }">
             <div class="flex items-start justify-between">
               <div class="flex-1 min-w-0">
                 <!-- Time -->
-                <p class="text-sm text-white font-medium">
+                <p class="text-sm text-white/90 font-medium">
                   {{ formatTime(snapshot.createdAt) }}
                 </p>
                 <!-- Author -->
-                <p class="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                <p class="text-xs text-white/40 mt-0.5 flex items-center gap-1">
                   <svg
                     class="w-3 h-3"
                     fill="none"
@@ -148,7 +148,7 @@
               </div>
               <!-- Size badge -->
               <span
-                class="text-[10px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded">
+                class="text-[10px] text-white/30 bg-white/5 px-1.5 py-0.5 rounded">
                 {{ formatSize(snapshot.size) }}
               </span>
             </div>
@@ -160,15 +160,15 @@
     <!-- Preview panel (when snapshot selected) -->
     <div
       v-if="selectedSnapshot && previewContent !== null"
-      class="border-t border-gray-700">
-      <div class="flex items-center justify-between px-4 py-2 bg-[#252526]">
-        <span class="text-xs text-gray-400">Preview</span>
+      class="border-t border-white/5">
+      <div class="flex items-center justify-between px-4 py-2 bg-white/2">
+        <span class="text-xs text-white/40">Preview</span>
         <div class="flex items-center gap-2">
           <button
             v-if="!isViewer"
             @click="restoreSnapshot"
             :disabled="isRestoring"
-            class="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed">
+            class="flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/15 text-white/90 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             <svg
               v-if="!isRestoring"
               class="w-3 h-3"
@@ -205,7 +205,7 @@
               selectedSnapshot = null;
               previewContent = null;
             "
-            class="p-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+            class="p-1 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-md transition-colors"
             title="Close preview">
             <svg
               class="w-3 h-3"
@@ -221,9 +221,9 @@
           </button>
         </div>
       </div>
-      <div class="max-h-48 overflow-auto bg-[#1e1e1e] border-t border-gray-800">
+      <div class="max-h-48 overflow-auto bg-[#0a0a0a] border-t border-white/5">
         <pre
-          class="p-3 text-xs text-gray-300 font-mono whitespace-pre-wrap break-all"
+          class="p-3 text-xs text-white/60 font-mono whitespace-pre-wrap break-all"
           >{{ previewContent }}</pre
         >
       </div>

@@ -1,161 +1,216 @@
 <template>
-  <div class="flex flex-col h-screen w-screen">
+  <div class="flex flex-col h-screen w-screen bg-[#0a0a0a]">
+    <!-- Top Navigation Bar -->
     <div
-      class="flex items-center gap-4 px-4 py-2 bg-[#1e1e1e] border-b border-gray-700 text-gray-400 text-xs font-sans">
-      <!-- Back button -->
-      <button
-        @click="emit('exit-room')"
-        class="flex items-center gap-1 px-2 py-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
-        title="Back to rooms">
-        <svg
-          class="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-        </svg>
-      </button>
-      <!-- Room name -->
-      <span class="font-medium text-white">{{ room.name }}</span>
-      <span
-        class="px-1.5 py-0.5 text-[10px] uppercase tracking-wider rounded"
-        :class="{
-          'bg-white text-black': room.userRole === 'owner',
-          'bg-gray-700 text-gray-200': room.userRole === 'editor',
-          'bg-gray-800 text-gray-400': room.userRole === 'viewer',
-        }">
-        {{ room.userRole }}
-      </span>
-      <span class="text-gray-600">|</span>
-      <span
-        class="flex items-center gap-1"
-        :class="isConnected ? 'text-green-500' : 'text-gray-400'">
-        {{ isConnected ? "● Connected" : "○ Disconnected" }}
-      </span>
-      <span
-        class="px-2 py-0.5 rounded text-white text-xs"
-        :style="{ backgroundColor: userColor }">
-        {{ userName }}
-      </span>
-      <span v-if="currentFile" class="text-gray-500">
-        {{ currentFile.path }}
-      </span>
-      <span v-if="typingCount > 0" class="text-orange-400 italic">
-        {{ typingCount }} user{{ typingCount > 1 ? "s" : "" }} typing...
-      </span>
-      <div class="flex items-center gap-2 ml-auto">
+      class="flex items-center h-12 px-4 bg-[#0a0a0a] border-b border-white/5">
+      <!-- Left section: Back + Logo + Room info -->
+      <div class="flex items-center gap-3">
+        <button
+          @click="emit('exit-room')"
+          class="p-1.5 text-gray-500 hover:text-white hover:bg-white/5 rounded-md transition-colors"
+          title="Back to rooms">
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.5"
+              d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+        </button>
+
+        <div class="flex items-center gap-2">
+          <img src="/logo.svg" alt="Swiftly" class="h-5 w-5" />
+          <span class="font-medium text-white text-sm">{{ room.name }}</span>
+        </div>
+
         <span
-          v-for="(cursor, id) in remoteCursors"
-          :key="id"
-          class="flex items-center gap-1 px-2 py-0.5 rounded text-white text-xs"
-          :style="{ backgroundColor: cursor.color }"
-          :title="
-            cursor.filePath ? `Editing: ${cursor.filePath}` : 'No file open'
-          ">
-          {{ cursor.name }}
-          <span v-if="cursor.fileName" class="text-[10px] opacity-75">
-            ({{ cursor.fileName }})
-          </span>
+          class="text-[10px] font-medium px-1.5 py-0.5 rounded uppercase tracking-wider"
+          :class="{
+            'bg-white/10 text-white': room.userRole === 'owner',
+            'bg-white/5 text-gray-400': room.userRole === 'editor',
+            'bg-white/5 text-gray-500': room.userRole === 'viewer',
+          }">
+          {{ room.userRole }}
         </span>
-        <button
-          @click="showVersionHistory = !showVersionHistory"
-          class="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
-          :class="{ 'bg-gray-700 text-white': showVersionHistory }"
-          title="Version history">
-          <svg
-            class="w-3.5 h-3.5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          History
-        </button>
-        <button
-          @click="downloadProject"
-          :disabled="isDownloading"
-          class="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
-          title="Download project as ZIP">
-          <svg
-            v-if="!isDownloading"
-            class="w-3.5 h-3.5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          <svg
-            v-else
-            class="w-3.5 h-3.5 animate-spin"
-            fill="none"
-            viewBox="0 0 24 24">
-            <circle
-              class="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
+
+        <div class="w-px h-4 bg-white/10 mx-1"></div>
+
+        <span
+          class="flex items-center gap-1.5 text-xs"
+          :class="isConnected ? 'text-emerald-400' : 'text-gray-500'">
+          <span
+            class="w-1.5 h-1.5 rounded-full"
+            :class="isConnected ? 'bg-emerald-400' : 'bg-gray-500'"></span>
+          {{ isConnected ? "Connected" : "Disconnected" }}
+        </span>
+      </div>
+
+      <!-- Center section: Current file path -->
+      <div class="flex-1 flex justify-center">
+        <span v-if="currentFile" class="text-xs text-gray-500 font-mono">
+          {{ currentFile.path }}
+        </span>
+      </div>
+
+      <!-- Right section: Users + Actions -->
+      <div class="flex items-center gap-3">
+        <!-- Typing indicator -->
+        <span v-if="typingCount > 0" class="text-xs text-amber-400/80 italic">
+          {{ typingCount }} typing...
+        </span>
+
+        <!-- Remote users avatars -->
+        <div class="flex items-center -space-x-2">
+          <div
+            v-for="(cursor, id) in remoteCursors"
+            :key="id"
+            class="relative group">
+            <div
+              class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-medium text-white border-2 border-[#0a0a0a] cursor-pointer"
+              :style="{ backgroundColor: cursor.color }"
+              :title="
+                cursor.name + (cursor.fileName ? ` - ${cursor.fileName}` : '')
+              ">
+              {{ cursor.name?.charAt(0)?.toUpperCase() || "?" }}
+            </div>
+            <!-- Tooltip on hover -->
+            <div
+              class="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-[#1a1a1a] border border-white/10 rounded text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              {{ cursor.name }}
+              <span v-if="cursor.fileName" class="text-gray-400">
+                · {{ cursor.fileName }}</span
+              >
+            </div>
+          </div>
+        </div>
+
+        <!-- Current user avatar -->
+        <div
+          class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-medium text-white ring-2 ring-white/20"
+          :style="{ backgroundColor: userColor }"
+          :title="userName">
+          {{ userName?.charAt(0)?.toUpperCase() || "?" }}
+        </div>
+
+        <div class="w-px h-4 bg-white/10"></div>
+
+        <!-- Action buttons -->
+        <div class="flex items-center gap-1">
+          <button
+            @click="showVersionHistory = !showVersionHistory"
+            class="p-1.5 text-gray-500 hover:text-white hover:bg-white/5 rounded-md transition-colors"
+            :class="{ 'bg-white/5 text-white': showVersionHistory }"
+            title="Version history">
+            <svg
+              class="w-4 h-4"
+              fill="none"
               stroke="currentColor"
-              stroke-width="4"></circle>
-            <path
-              class="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          {{ isDownloading ? "Exporting..." : "Export ZIP" }}
-        </button>
-        <button
-          @click="emit('logout')"
-          class="px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors">
-          Logout
-        </button>
+              viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.5"
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+
+          <button
+            @click="downloadProject"
+            :disabled="isDownloading"
+            class="p-1.5 text-gray-500 hover:text-white hover:bg-white/5 rounded-md transition-colors disabled:opacity-50"
+            title="Export as ZIP">
+            <svg
+              v-if="!isDownloading"
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.5"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <svg
+              v-else
+              class="w-4 h-4 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24">
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="3"></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+          </button>
+
+          <button
+            @click="emit('logout')"
+            class="p-1.5 text-gray-500 hover:text-white hover:bg-white/5 rounded-md transition-colors"
+            title="Logout">
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.5"
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
+
+    <!-- Main Content Area -->
     <div class="flex flex-1 overflow-hidden">
       <!-- File Explorer Sidebar -->
-      <div class="w-64 shrink-0 border-r border-gray-700">
+      <div class="w-56 shrink-0 border-r border-white/5 bg-[#0a0a0a]">
         <FileExplorer
           ref="fileExplorerRef"
           :room-id="room.id"
           :read-only="isViewer"
           @file-select="handleFileSelect" />
       </div>
-      <!-- Editor -->
+
+      <!-- Editor Area -->
       <div
         ref="editorContainer"
-        class="overflow-hidden relative"
+        class="overflow-hidden relative bg-[#0a0a0a]"
         :class="showPreview ? 'w-1/2' : 'flex-1'">
-        <!-- Read-only overlay for viewers -->
+        <!-- Read-only badge for viewers -->
         <div
           v-if="isViewer"
-          class="absolute top-2 right-2 z-10 px-2 py-1 bg-gray-800 text-gray-400 text-xs rounded">
-          Read-only mode
+          class="absolute top-3 right-3 z-10 px-2 py-1 bg-white/5 text-gray-400 text-[10px] rounded-md border border-white/5">
+          Read-only
         </div>
       </div>
+
       <!-- Live Preview Panel -->
       <div
         v-if="showPreview"
-        class="w-1/2 flex flex-col border-l border-gray-700 bg-white">
+        class="w-1/2 flex flex-col border-l border-white/5">
         <!-- Preview Header -->
         <div
-          class="flex items-center justify-between px-3 py-2 bg-[#1e1e1e] border-b border-gray-700">
+          class="flex items-center justify-between px-3 h-10 bg-[#0a0a0a] border-b border-white/5">
           <div class="flex items-center gap-2">
-            <span class="text-gray-400 text-xs">Live Preview</span>
+            <span class="text-xs text-gray-500">Preview</span>
             <button
               @click="refreshPreview"
-              class="p-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
-              title="Refresh Preview">
+              class="p-1 text-gray-500 hover:text-white hover:bg-white/5 rounded transition-colors"
+              title="Refresh">
               <svg
                 class="w-3.5 h-3.5"
                 fill="none"
@@ -164,15 +219,15 @@
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
-                  stroke-width="2"
+                  stroke-width="1.5"
                   d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
           </div>
           <button
             @click="showPreview = false"
-            class="p-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
-            title="Close Preview">
+            class="p-1 text-gray-500 hover:text-white hover:bg-white/5 rounded transition-colors"
+            title="Close">
             <svg
               class="w-3.5 h-3.5"
               fill="none"
@@ -181,7 +236,7 @@
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                stroke-width="2"
+                stroke-width="1.5"
                 d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -194,14 +249,15 @@
           title="Live Preview">
         </iframe>
       </div>
-      <!-- Preview Toggle Button (shows when preview is hidden and file is previewable) -->
+
+      <!-- Preview Toggle Button -->
       <button
         v-if="!showPreview && isPreviewable"
         @click="
           showPreview = true;
           updatePreview();
         "
-        class="absolute right-4 bottom-4 flex items-center gap-2 px-3 py-2 bg-[#2d2d2d] text-gray-300 hover:bg-[#3d3d3d] rounded-lg shadow-lg border border-gray-600 z-20"
+        class="absolute right-4 bottom-4 flex items-center gap-2 px-3 py-2 bg-white/5 text-gray-300 hover:bg-white/10 rounded-lg border border-white/10 z-20 transition-colors"
         title="Open Live Preview">
         <svg
           class="w-4 h-4"
@@ -211,21 +267,22 @@
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
-            stroke-width="2"
+            stroke-width="1.5"
             d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
-            stroke-width="2"
+            stroke-width="1.5"
             d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
         </svg>
         <span class="text-xs">Preview</span>
       </button>
-      <!-- Version History Panel (slide-out from right) -->
+
+      <!-- Version History Panel -->
       <Transition name="slide">
         <div
           v-if="showVersionHistory"
-          class="absolute right-0 top-0 bottom-0 w-80 border-l border-gray-700 z-30 shadow-xl">
+          class="absolute right-0 top-0 bottom-0 w-80 border-l border-white/5 z-30 shadow-2xl">
           <VersionHistory
             ref="versionHistoryRef"
             :current-file="currentFile"
@@ -956,11 +1013,64 @@ onMounted(() => {
   // Connect to Django WebSocket
   connectWebSocket();
 
+  // Define custom dark theme to match app style
+  monaco.editor.defineTheme("swiftly-dark", {
+    base: "vs-dark",
+    inherit: true,
+    rules: [
+      { token: "comment", foreground: "6b7280", fontStyle: "italic" },
+      { token: "keyword", foreground: "c084fc" },
+      { token: "string", foreground: "86efac" },
+      { token: "number", foreground: "fcd34d" },
+      { token: "type", foreground: "67e8f9" },
+      { token: "function", foreground: "60a5fa" },
+      { token: "variable", foreground: "e5e7eb" },
+      { token: "constant", foreground: "f9a8d4" },
+      { token: "tag", foreground: "f87171" },
+      { token: "attribute.name", foreground: "fbbf24" },
+      { token: "attribute.value", foreground: "86efac" },
+    ],
+    colors: {
+      "editor.background": "#0a0a0a",
+      "editor.foreground": "#e5e7eb",
+      "editor.lineHighlightBackground": "#ffffff08",
+      "editor.selectionBackground": "#ffffff15",
+      "editor.inactiveSelectionBackground": "#ffffff10",
+      "editorCursor.foreground": "#ffffff",
+      "editorLineNumber.foreground": "#4b5563",
+      "editorLineNumber.activeForeground": "#9ca3af",
+      "editorIndentGuide.background": "#ffffff08",
+      "editorIndentGuide.activeBackground": "#ffffff15",
+      "editorWhitespace.foreground": "#ffffff10",
+      "editor.selectionHighlightBackground": "#ffffff10",
+      "editor.wordHighlightBackground": "#ffffff10",
+      "editor.wordHighlightStrongBackground": "#ffffff15",
+      "editorBracketMatch.background": "#ffffff15",
+      "editorBracketMatch.border": "#ffffff30",
+      "scrollbarSlider.background": "#ffffff10",
+      "scrollbarSlider.hoverBackground": "#ffffff20",
+      "scrollbarSlider.activeBackground": "#ffffff30",
+      "editorWidget.background": "#0f0f0f",
+      "editorWidget.border": "#ffffff10",
+      "editorSuggestWidget.background": "#0f0f0f",
+      "editorSuggestWidget.border": "#ffffff10",
+      "editorSuggestWidget.selectedBackground": "#ffffff15",
+      "editorSuggestWidget.highlightForeground": "#60a5fa",
+      "editorHoverWidget.background": "#0f0f0f",
+      "editorHoverWidget.border": "#ffffff10",
+      "input.background": "#ffffff08",
+      "input.border": "#ffffff10",
+      focusBorder: "#ffffff20",
+      "list.hoverBackground": "#ffffff08",
+      "list.activeSelectionBackground": "#ffffff15",
+    },
+  });
+
   // Initialize Monaco Editor with enhanced features
   editor = monaco.editor.create(editorContainer.value, {
     value: "",
     language: "javascript",
-    theme: "vs-dark",
+    theme: "swiftly-dark",
     automaticLayout: true,
     minimap: { enabled: false },
     fontSize: 14,
@@ -993,6 +1103,11 @@ onMounted(() => {
     linkedEditing: true,
     renderWhitespace: "selection",
     smoothScrolling: true,
+    // Additional styling
+    padding: { top: 12, bottom: 12 },
+    cursorBlinking: "smooth",
+    cursorSmoothCaretAnimation: "on",
+    roundedSelection: true,
   });
 
   // Enable Emmet for HTML, CSS, and JSX
@@ -1112,7 +1227,7 @@ function connectWebSocket() {
         // The Yjs doc has separate text objects per file (file-{id})
         // This ensures we don't miss updates while viewing other files
         const targetFileId = message.fileId;
-        
+
         if (targetFileId) {
           // Decode base64 and apply update
           const binary = atob(message.data);
@@ -1126,7 +1241,7 @@ function connectWebSocket() {
       } else if (message.type === "yjs-state") {
         // Apply stored state from server - always apply for any file
         const targetFileId = message.fileId;
-        
+
         if (targetFileId) {
           const binary = atob(message.data);
           const state = new Uint8Array(binary.length);
@@ -1183,7 +1298,11 @@ function connectWebSocket() {
 
           // Only initialize from DB if there's NO Yjs content at all
           // (no stored updates from server AND no updates received while viewing other files)
-          if (!message.hasUpdates && ytext.length === 0 && pendingFileSync.fileContent) {
+          if (
+            !message.hasUpdates &&
+            ytext.length === 0 &&
+            pendingFileSync.fileContent
+          ) {
             ytext.insert(0, pendingFileSync.fileContent);
           }
 

@@ -7,25 +7,23 @@
       @contextmenu.prevent="close">
       <div
         ref="menuRef"
-        class="absolute bg-[#252526] border border-gray-600 rounded shadow-xl py-1 min-w-40 z-50"
+        class="absolute bg-[#0f0f0f] border border-white/10 rounded-lg shadow-xl py-1 min-w-40 z-50"
         :style="{ top: `${position.y}px`, left: `${position.x}px` }"
         @click.stop>
         <div v-for="(item, index) in items" :key="index">
-          <div
-            v-if="item.separator"
-            class="border-t border-gray-600 my-1"></div>
+          <div v-if="item.separator" class="border-t border-white/5 my-1"></div>
           <button
             v-else
             @click="handleClick(item)"
             :disabled="item.disabled"
-            class="w-full px-3 py-1.5 text-left text-sm text-gray-300 hover:bg-[#094771] hover:text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            class="w-full px-3 py-1.5 text-left text-sm text-white/70 hover:bg-white/10 hover:text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             <span
               v-if="item.icon"
-              class="w-4 h-4 flex items-center justify-center"
+              class="w-4 h-4 flex items-center justify-center text-white/50"
               v-html="item.icon"></span>
             <span v-else class="w-4"></span>
             <span>{{ item.label }}</span>
-            <span v-if="item.shortcut" class="ml-auto text-xs text-gray-500">{{
+            <span v-if="item.shortcut" class="ml-auto text-xs text-white/30">{{
               item.shortcut
             }}</span>
           </button>
