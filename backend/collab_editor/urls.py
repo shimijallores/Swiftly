@@ -21,6 +21,12 @@ urlpatterns = [
     path('api/files/<uuid:file_id>/delete/', views.file_delete_view, name='file_delete'),
     path('api/files/<uuid:file_id>/move/', views.file_move_view, name='file_move'),
     
+    # Version history endpoints
+    path('api/files/<uuid:file_id>/snapshots/', views.file_snapshots_view, name='file_snapshots'),
+    path('api/files/<uuid:file_id>/auto-snapshot/', views.auto_snapshot_view, name='auto_snapshot'),
+    path('api/snapshots/<uuid:snapshot_id>/', views.snapshot_detail_view, name='snapshot_detail'),
+    path('api/snapshots/<uuid:snapshot_id>/restore/', views.snapshot_restore_view, name='snapshot_restore'),
+    
     # Room endpoints
     path('api/rooms/', views.rooms_view, name='rooms'),
     path('api/rooms/join/', views.room_join_view, name='room_join'),

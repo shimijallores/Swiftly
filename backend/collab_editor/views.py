@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
 import json
 
-from .models import CollabUser, VirtualFile, Room, RoomMember
+from .models import CollabUser, VirtualFile, Room, RoomMember, FileSnapshot
 
 
 # ============ Auth Views ============
@@ -599,3 +599,135 @@ def room_member_kick_view(request, room_id, member_id):
     
     except Room.DoesNotExist:
         return JsonResponse({'error': 'Room not found'}, status=404)
+
+
+# ============ Version History Views ============
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def file_snapshots_view(request, file_id):
+    """
+    GET: List all snapshots for a file.
+    POST: Create a new snapshot (manual save point).
+    """
+    try:
+        file = VirtualFile.objects.get(id=file_id, type=VirtualFile.FILE)
+    except VirtualFile.DoesNotExist:
+        return JsonResponse({'error': 'File not found'}, status=404)
+    
+    if request.method == "GET":
+        snapshots = FileSnapshot.objects.filter(file=file).order_by('-created_at')[:100]
+        return JsonResponse({
+            'snapshots': [s.to_dict() for s in snapshots],
+            'fileId': str(file.id),
+            'fileName': file.name,
+        })
+    
+    elif request.method == "POST":
+        # Create a manual snapshot
+        user = request.user if request.user.is_authenticated else None
+        
+        # Update file content first if provided
+        try:
+            data = json.loads(request.body)
+            if 'content' in data:
+                file.content = data['content']
+                file.save(update_fields=['content', 'updated_at'])
+        except json.JSONDecodeError:
+            pass
+        
+        snapshot = FileSnapshot.create_snapshot(file, user)
+        
+        if snapshot:
+            # Cleanup old snapshots (keep last 50)
+            FileSnapshot.cleanup_old_snapshots(file, keep_count=50)
+            return JsonResponse(snapshot.to_dict(), status=201)
+        else:
+            return JsonResponse({'message': 'No changes to snapshot'}, status=200)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def snapshot_detail_view(request, snapshot_id):
+    """
+    GET: Get a specific snapshot with its content.
+    """
+    try:
+        snapshot = FileSnapshot.objects.get(id=snapshot_id)
+        data = snapshot.to_dict()
+        data['content'] = snapshot.content
+        return JsonResponse(data)
+    except FileSnapshot.DoesNotExist:
+        return JsonResponse({'error': 'Snapshot not found'}, status=404)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def snapshot_restore_view(request, snapshot_id):
+    """
+    POST: Restore a file to a specific snapshot.
+    Creates a new snapshot of current state before restoring.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        snapshot = FileSnapshot.objects.get(id=snapshot_id)
+        file = snapshot.file
+        
+        # Create a snapshot of current state before restoring (backup)
+        FileSnapshot.create_snapshot(file, request.user)
+        
+        # Restore the file content
+        file.content = snapshot.content
+        file.save(update_fields=['content', 'updated_at'])
+        
+        # Create a snapshot marking the restore
+        restore_snapshot = FileSnapshot.objects.create(
+            file=file,
+            content=file.content,
+            author=request.user,
+            author_name=request.user.username,
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'file': file.to_dict(),
+            'snapshot': restore_snapshot.to_dict(),
+        })
+    except FileSnapshot.DoesNotExist:
+        return JsonResponse({'error': 'Snapshot not found'}, status=404)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def auto_snapshot_view(request, file_id):
+    """
+    POST: Create an automatic snapshot (called by frontend with debounce).
+    Only creates if content has changed from last snapshot.
+    """
+    try:
+        file = VirtualFile.objects.get(id=file_id, type=VirtualFile.FILE)
+    except VirtualFile.DoesNotExist:
+        return JsonResponse({'error': 'File not found'}, status=404)
+    
+    try:
+        data = json.loads(request.body)
+        content = data.get('content')
+        
+        if content is not None:
+            # Update file content
+            file.content = content
+            file.save(update_fields=['content', 'updated_at'])
+    except json.JSONDecodeError:
+        pass
+    
+    user = request.user if request.user.is_authenticated else None
+    snapshot = FileSnapshot.create_snapshot(file, user)
+    
+    if snapshot:
+        # Cleanup old snapshots
+        FileSnapshot.cleanup_old_snapshots(file, keep_count=50)
+        return JsonResponse(snapshot.to_dict(), status=201)
+    
+    return JsonResponse({'message': 'No changes'}, status=200)

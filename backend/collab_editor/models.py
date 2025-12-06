@@ -259,3 +259,78 @@ class RoomMember(models.Model):
             'role': self.role,
             'joinedAt': self.joined_at.isoformat(),
         }
+
+
+class FileSnapshot(models.Model):
+    """
+    Version history snapshot for a file.
+    Stores content snapshots with timestamps and author info.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    file = models.ForeignKey(VirtualFile, on_delete=models.CASCADE, related_name='snapshots')
+    content = models.TextField()
+    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    author_name = models.CharField(max_length=100, default='Unknown')  # Cached name in case user is deleted
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Size in bytes for display
+    size = models.IntegerField(default=0)
+    
+    class Meta:
+        verbose_name = "File Snapshot"
+        verbose_name_plural = "File Snapshots"
+        ordering = ['-created_at']  # Most recent first
+    
+    def __str__(self):
+        return f"Snapshot of {self.file.name} at {self.created_at}"
+    
+    def save(self, *args, **kwargs):
+        # Calculate size before saving
+        self.size = len(self.content.encode('utf-8'))
+        super().save(*args, **kwargs)
+    
+    def to_dict(self):
+        """Convert to dictionary for JSON serialization."""
+        return {
+            'id': str(self.id),
+            'fileId': str(self.file.id),
+            'fileName': self.file.name,
+            'authorId': self.author.id if self.author else None,
+            'authorName': self.author_name,
+            'createdAt': self.created_at.isoformat(),
+            'size': self.size,
+        }
+    
+    @classmethod
+    def create_snapshot(cls, file, user=None):
+        """
+        Create a new snapshot for a file.
+        Returns the created snapshot or None if content unchanged.
+        """
+        # Get the latest snapshot to compare
+        latest = cls.objects.filter(file=file).first()
+        
+        # Don't create duplicate snapshots if content is identical
+        if latest and latest.content == file.content:
+            return None
+        
+        author_name = 'Unknown'
+        if user:
+            author_name = user.username
+        
+        return cls.objects.create(
+            file=file,
+            content=file.content,
+            author=user,
+            author_name=author_name,
+        )
+    
+    @classmethod
+    def cleanup_old_snapshots(cls, file, keep_count=10):
+        """
+        Keep only the most recent N snapshots for a file.
+        Default keeps 10 snapshots.
+        """
+        snapshots = cls.objects.filter(file=file).order_by('-created_at')
+        to_delete = snapshots[keep_count:]
+        if to_delete.exists():
+            to_delete.delete()

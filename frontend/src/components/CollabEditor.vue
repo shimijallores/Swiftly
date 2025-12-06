@@ -62,18 +62,58 @@
           </span>
         </span>
         <button
+          @click="showVersionHistory = !showVersionHistory"
+          class="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+          :class="{ 'bg-gray-700 text-white': showVersionHistory }"
+          title="Version history">
+          <svg
+            class="w-3.5 h-3.5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          History
+        </button>
+        <button
           @click="downloadProject"
           :disabled="isDownloading"
           class="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
           title="Download project as ZIP">
-          <svg v-if="!isDownloading" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          <svg
+            v-if="!isDownloading"
+            class="w-3.5 h-3.5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          <svg v-else class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          <svg
+            v-else
+            class="w-3.5 h-3.5 animate-spin"
+            fill="none"
+            viewBox="0 0 24 24">
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"></circle>
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          {{ isDownloading ? 'Exporting...' : 'Export ZIP' }}
+          {{ isDownloading ? "Exporting..." : "Export ZIP" }}
         </button>
         <button
           @click="emit('logout')"
@@ -181,6 +221,19 @@
         </svg>
         <span class="text-xs">Preview</span>
       </button>
+      <!-- Version History Panel (slide-out from right) -->
+      <Transition name="slide">
+        <div
+          v-if="showVersionHistory"
+          class="absolute right-0 top-0 bottom-0 w-80 border-l border-gray-700 z-30 shadow-xl">
+          <VersionHistory
+            ref="versionHistoryRef"
+            :current-file="currentFile"
+            :is-viewer="isViewer"
+            @close="showVersionHistory = false"
+            @restore="handleVersionRestore" />
+        </div>
+      </Transition>
     </div>
   </div>
 </template>
@@ -194,6 +247,7 @@ import { emmetHTML, emmetCSS, emmetJSX } from "emmet-monaco-es";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import FileExplorer from "./FileExplorer.vue";
+import VersionHistory from "./VersionHistory.vue";
 
 const props = defineProps({
   user: {
@@ -211,10 +265,12 @@ const emit = defineEmits(["logout", "exit-room"]);
 const editorContainer = ref(null);
 const previewFrame = ref(null);
 const fileExplorerRef = ref(null);
+const versionHistoryRef = ref(null);
 const isConnected = ref(false);
 const typingCount = ref(0);
 const currentFile = ref(null);
 const showPreview = ref(false);
+const showVersionHistory = ref(false);
 const isDownloading = ref(false);
 
 // Use user data from props
@@ -233,6 +289,7 @@ let binding = null;
 let typingTimeout = null;
 let cursorUpdateTimeout = null;
 let saveTimeout = null;
+let autoSnapshotTimeout = null; // Debounce auto-snapshots (30 seconds)
 let currentFileId = null; // Track current file for per-file sync
 let previewUpdateTimeout = null; // Debounce preview updates
 
@@ -310,23 +367,17 @@ function handleFileSelect(file) {
       model.setValue(""); // Clear while loading
     }
 
-    // If Yjs already has content for this file (from earlier in this session), use it
-    if (ytext.length > 0) {
-      binding = new MonacoBinding(ytext, editor.getModel(), new Set([editor]));
-      pendingFileSync = null;
-    } else {
-      // Don't create binding yet - wait for server sync to complete
-      // Mark that we're waiting for server sync
-      pendingFileSync = {
-        fileId: file.id,
-        fileContent: file.content || "",
-        ytext: ytext, // Store reference for later binding creation
-      };
+    // Always request sync from server to get any stored updates
+    // (in case of server restart, late joining, etc.)
+    pendingFileSync = {
+      fileId: file.id,
+      fileContent: file.content || "",
+      ytext: ytext,
+    };
 
-      // Request any stored Yjs updates for this file from the server
-      // Server will respond with file-sync-complete when done
-      requestFileSync(file.id);
-    }
+    // Request any stored Yjs updates for this file from the server
+    // Server will respond with file-sync-complete when done
+    requestFileSync(file.id);
   }
 
   // Broadcast which file we're now editing
@@ -388,6 +439,63 @@ function debouncedSave() {
   saveTimeout = setTimeout(() => {
     saveFileContent();
   }, 2000);
+}
+
+// Auto-snapshot: Create a snapshot after 30 seconds of inactivity
+// This prevents overloading the server while still capturing meaningful versions
+function debouncedAutoSnapshot() {
+  if (autoSnapshotTimeout) {
+    clearTimeout(autoSnapshotTimeout);
+  }
+  autoSnapshotTimeout = setTimeout(() => {
+    createAutoSnapshot();
+  }, 30000); // 30 seconds debounce
+}
+
+// Create an automatic snapshot
+async function createAutoSnapshot() {
+  if (!currentFile.value || !editor || isViewer.value) return;
+
+  const content = editor.getValue();
+  if (!content.trim()) return; // Don't snapshot empty files
+
+  try {
+    await fetch(
+      `http://localhost:8000/api/files/${currentFile.value.id}/auto-snapshot/`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      }
+    );
+    console.log("Auto-snapshot created");
+    // Refresh version history if it's open
+    if (showVersionHistory.value && versionHistoryRef.value) {
+      versionHistoryRef.value.refresh();
+    }
+  } catch (error) {
+    console.error("Auto-snapshot failed:", error);
+  }
+}
+
+// Handle version restore from VersionHistory component
+function handleVersionRestore({ fileId, content }) {
+  if (!editor || fileId !== currentFile.value?.id) return;
+
+  // Get the current Yjs text for this file
+  const ytext = ydoc.getText(`file-${fileId}`);
+
+  // Replace content in Yjs (this will sync to all users)
+  ydoc.transact(() => {
+    ytext.delete(0, ytext.length);
+    ytext.insert(0, content);
+  });
+
+  // Also save to server
+  saveFileContent();
+
+  console.log("Version restored successfully");
 }
 
 // Update live preview with current HTML content
@@ -590,21 +698,21 @@ function refreshPreview() {
 // Download project as ZIP file
 async function downloadProject() {
   if (isDownloading.value) return;
-  
+
   isDownloading.value = true;
-  
+
   try {
     // Get all project files
     const allFiles = await getAllProjectFiles();
-    
+
     if (allFiles.length === 0) {
-      alert('No files to download');
+      alert("No files to download");
       return;
     }
-    
+
     // Create a new ZIP file
     const zip = new JSZip();
-    
+
     // Fetch content for each file and add to ZIP
     for (const file of allFiles) {
       const content = await fetchFileContent(file.id);
@@ -613,25 +721,24 @@ async function downloadProject() {
         zip.file(file.fullPath, content);
       }
     }
-    
+
     // Generate the ZIP file
-    const blob = await zip.generateAsync({ 
-      type: 'blob',
-      compression: 'DEFLATE',
-      compressionOptions: { level: 6 }
+    const blob = await zip.generateAsync({
+      type: "blob",
+      compression: "DEFLATE",
+      compressionOptions: { level: 6 },
     });
-    
+
     // Create filename with room name and timestamp
     const timestamp = new Date().toISOString().slice(0, 10);
-    const safeName = props.room.name.replace(/[^a-zA-Z0-9-_]/g, '_');
-    const filename = safeName + '_' + timestamp + '.zip';
-    
+    const safeName = props.room.name.replace(/[^a-zA-Z0-9-_]/g, "_");
+    const filename = safeName + "_" + timestamp + ".zip";
+
     // Download the file
     saveAs(blob, filename);
-    
   } catch (error) {
-    console.error('Error downloading project:', error);
-    alert('Failed to download project: ' + error.message);
+    console.error("Error downloading project:", error);
+    alert("Failed to download project: " + error.message);
   } finally {
     isDownloading.value = false;
   }
@@ -925,6 +1032,9 @@ onMounted(() => {
     // Trigger debounced save
     debouncedSave();
 
+    // Trigger debounced auto-snapshot (30 seconds of inactivity)
+    debouncedAutoSnapshot();
+
     // Update live preview if showing
     if (showPreview.value && isPreviewable.value) {
       debouncedPreviewUpdate();
@@ -998,19 +1108,26 @@ function connectWebSocket() {
       const message = JSON.parse(event.data);
 
       if (message.type === "yjs-update") {
-        // Only apply updates for the same file we're editing
-        if (message.fileId && message.fileId === currentFileId) {
+        // ALWAYS apply updates to the Yjs document for ANY file
+        // The Yjs doc has separate text objects per file (file-{id})
+        // This ensures we don't miss updates while viewing other files
+        const targetFileId = message.fileId;
+        
+        if (targetFileId) {
           // Decode base64 and apply update
           const binary = atob(message.data);
           const update = new Uint8Array(binary.length);
           for (let i = 0; i < binary.length; i++) {
             update[i] = binary.charCodeAt(i);
           }
+          // Apply update to the ydoc - it will route to the correct ytext
           Y.applyUpdate(ydoc, update, "remote");
         }
       } else if (message.type === "yjs-state") {
-        // Apply stored state from server (only if for the same file)
-        if (message.fileId && message.fileId === currentFileId) {
+        // Apply stored state from server - always apply for any file
+        const targetFileId = message.fileId;
+        
+        if (targetFileId) {
           const binary = atob(message.data);
           const state = new Uint8Array(binary.length);
           for (let i = 0; i < binary.length; i++) {
@@ -1064,15 +1181,19 @@ function connectWebSocket() {
         if (pendingFileSync && pendingFileSync.fileId === fileId) {
           const ytext = pendingFileSync.ytext || ydoc.getText(`file-${fileId}`);
 
-          if (!message.hasUpdates) {
-            // No updates on server - initialize with DB content
-            if (ytext.length === 0 && pendingFileSync.fileContent) {
-              ytext.insert(0, pendingFileSync.fileContent);
-            }
+          // Only initialize from DB if there's NO Yjs content at all
+          // (no stored updates from server AND no updates received while viewing other files)
+          if (!message.hasUpdates && ytext.length === 0 && pendingFileSync.fileContent) {
+            ytext.insert(0, pendingFileSync.fileContent);
           }
 
-          // Now create the binding after sync is complete
-          if (!binding && editor) {
+          // Create or recreate the binding after sync is complete
+          if (editor) {
+            // Destroy existing binding first to prevent issues
+            if (binding) {
+              binding.destroy();
+              binding = null;
+            }
             binding = new MonacoBinding(
               ytext,
               editor.getModel(),
@@ -1098,6 +1219,7 @@ onUnmounted(() => {
   if (cursorUpdateTimeout) clearTimeout(cursorUpdateTimeout);
   if (saveTimeout) clearTimeout(saveTimeout);
   if (previewUpdateTimeout) clearTimeout(previewUpdateTimeout);
+  if (autoSnapshotTimeout) clearTimeout(autoSnapshotTimeout);
   // Clean up cursor widgets and styles
   for (const id of cursorWidgets.keys()) {
     removeCursorWidget(id);
@@ -1111,5 +1233,16 @@ onUnmounted(() => {
 .remote-cursor-widget {
   position: relative;
   z-index: 100;
+}
+
+/* Version history slide animation */
+.slide-enter-active,
+.slide-leave-active {
+  transition: transform 0.2s ease-out;
+}
+
+.slide-enter-from,
+.slide-leave-to {
+  transform: translateX(100%);
 }
 </style>
