@@ -381,8 +381,7 @@ function updateCursorWidget(remoteClientId, position, color, name) {
       nameLabel.style.padding = "1px 4px";
       nameLabel.style.borderRadius = "2px";
       nameLabel.style.position = "absolute";
-      nameLabel.style.top = "-16px";
-      nameLabel.style.left = "0";
+      nameLabel.style.left = "8px";
       nameLabel.style.whiteSpace = "nowrap";
       nameLabel.style.zIndex = "100";
 
