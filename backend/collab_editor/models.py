@@ -105,19 +105,27 @@ class VirtualFile(models.Model):
             return
         
         # Create default structure
-        src = cls.objects.create(room_id=room_id, name='src', type=cls.FOLDER)
         cls.objects.create(
             room_id=room_id, 
             name='main.js', 
             type=cls.FILE, 
-            parent=src,
             content='// Welcome to Swiftly!\nconsole.log("Hello, World!");\n'
+        )
+        cls.objects.create(
+            room_id=room_id, 
+            name='index.html', 
+            type=cls.FILE, 
+        )
+        cls.objects.create(
+            room_id=room_id, 
+            name='style.css', 
+            type=cls.FILE, 
         )
         cls.objects.create(
             room_id=room_id, 
             name='README.md', 
             type=cls.FILE,
-            content='# My Project\n\nWelcome to your collaborative project!\n'
+            content='# My Project\n\nWelcome to your swiftly!\n'
         )
 
 
