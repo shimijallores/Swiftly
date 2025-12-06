@@ -2,6 +2,29 @@ from django.db import models
 import random
 
 
+class Document(models.Model):
+    """
+    Stores the Yjs document state for persistence.
+    Currently uses a single global document (room_id='default').
+    """
+    room_id = models.CharField(max_length=100, unique=True, db_index=True, default='default')
+    yjs_state = models.BinaryField(null=True, blank=True)  # Store Yjs update as binary
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Document"
+        verbose_name_plural = "Documents"
+
+    def __str__(self):
+        return f"Document {self.room_id}"
+
+    @classmethod
+    def get_or_create_document(cls, room_id='default'):
+        doc, created = cls.objects.get_or_create(room_id=room_id)
+        return doc
+
+
 class CollabUser(models.Model):
     """
     Represents a collaborative editor user with persistent identity.

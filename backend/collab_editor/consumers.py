@@ -1,6 +1,8 @@
 import json
 import base64
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import database_sync_to_async
+from .models import Document
 
 
 class YjsSyncConsumer(AsyncWebsocketConsumer):
@@ -10,12 +12,42 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
     """
     
     room_group_name = "collab_room"  # Single global room
-    # Store the document state in memory (shared across all connections)
-    document_state = None
+    # Store all document updates in memory (shared across all connections)
+    document_updates = []  # List of base64 encoded updates
     # Store cursor states for all connected users
     cursor_states = {}
     
+    @database_sync_to_async
+    def load_document_updates(self):
+        """Load document updates from database."""
+        doc = Document.get_or_create_document()
+        if doc.yjs_state:
+            # The stored state is a JSON array of base64 updates
+            try:
+                return json.loads(doc.yjs_state.decode('utf-8'))
+            except:
+                # Legacy: single update stored
+                return [base64.b64encode(doc.yjs_state).decode('utf-8')]
+        return []
+    
+    @database_sync_to_async
+    def save_document_updates(self, updates_list):
+        """Save all document updates to database."""
+        try:
+            doc = Document.get_or_create_document()
+            # Store as JSON array of base64 updates
+            doc.yjs_state = json.dumps(updates_list).encode('utf-8')
+            doc.save(update_fields=['yjs_state', 'updated_at'])
+            print(f"Document saved to DB, {len(updates_list)} updates")
+        except Exception as e:
+            print(f"Error saving document: {e}")
+    
     async def connect(self):
+        # Load document updates from DB if not in memory
+        if not YjsSyncConsumer.document_updates:
+            YjsSyncConsumer.document_updates = await self.load_document_updates()
+            print(f"Loaded {len(YjsSyncConsumer.document_updates)} updates from DB")
+        
         # Join the global room group
         await self.channel_layer.group_add(
             self.room_group_name,
@@ -57,25 +89,30 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
                 msg_type = message.get('type')
                 
                 if msg_type == 'yjs-update':
-                    # Store the latest state
-                    YjsSyncConsumer.document_state = message.get('data')
+                    # Add update to the list
+                    update_data = message.get('data')
+                    YjsSyncConsumer.document_updates.append(update_data)
+                    
+                    # Save all updates to database
+                    await self.save_document_updates(YjsSyncConsumer.document_updates)
                     
                     # Broadcast the Yjs update to all clients in the room
                     await self.channel_layer.group_send(
                         self.room_group_name,
                         {
                             "type": "yjs_update",
-                            "data": message.get('data'),
+                            "data": update_data,
                             "sender_channel": self.channel_name,
                         }
                     )
                 elif msg_type == 'sync-request':
-                    # Send current state to the requesting client
-                    if YjsSyncConsumer.document_state:
-                        await self.send(text_data=json.dumps({
-                            "type": "yjs-state",
-                            "data": YjsSyncConsumer.document_state
-                        }))
+                    # Send all stored updates to the requesting client
+                    if YjsSyncConsumer.document_updates:
+                        for update in YjsSyncConsumer.document_updates:
+                            await self.send(text_data=json.dumps({
+                                "type": "yjs-state",
+                                "data": update
+                            }))
                 elif msg_type == 'awareness':
                     # Broadcast awareness (typing indicator) to all other clients
                     await self.channel_layer.group_send(
