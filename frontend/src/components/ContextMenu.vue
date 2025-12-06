@@ -7,7 +7,7 @@
       @contextmenu.prevent="close">
       <div
         ref="menuRef"
-        class="absolute bg-[#252526] border border-gray-600 rounded shadow-xl py-1 min-w-[160px] z-50"
+        class="absolute bg-[#252526] border border-gray-600 rounded shadow-xl py-1 min-w-40 z-50"
         :style="{ top: `${position.y}px`, left: `${position.x}px` }"
         @click.stop>
         <div v-for="(item, index) in items" :key="index">
