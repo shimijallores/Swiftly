@@ -55,7 +55,7 @@ const emit = defineEmits(["navigate", "go-to-rooms"]);
         <div class="grid md:grid-cols-3 gap-6">
           <!-- Feature 1 -->
           <div
-            class="p-6 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors">
+            class="p-6 rounded-xl bg-white/2 border border-white/5 hover:border-white/10 transition-colors">
             <div
               class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4">
               <svg
@@ -79,7 +79,7 @@ const emit = defineEmits(["navigate", "go-to-rooms"]);
 
           <!-- Feature 2 -->
           <div
-            class="p-6 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors">
+            class="p-6 rounded-xl bg-white/2 border border-white/5 hover:border-white/10 transition-colors">
             <div
               class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4">
               <svg
@@ -103,7 +103,7 @@ const emit = defineEmits(["navigate", "go-to-rooms"]);
 
           <!-- Feature 3 -->
           <div
-            class="p-6 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors">
+            class="p-6 rounded-xl bg-white/2 border border-white/5 hover:border-white/10 transition-colors">
             <div
               class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4">
               <svg
@@ -127,7 +127,7 @@ const emit = defineEmits(["navigate", "go-to-rooms"]);
 
           <!-- Feature 4 -->
           <div
-            class="p-6 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors">
+            class="p-6 rounded-xl bg-white/2 border border-white/5 hover:border-white/10 transition-colors">
             <div
               class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4">
               <svg
@@ -151,7 +151,7 @@ const emit = defineEmits(["navigate", "go-to-rooms"]);
 
           <!-- Feature 5 -->
           <div
-            class="p-6 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors">
+            class="p-6 rounded-xl bg-white/2 border border-white/5 hover:border-white/10 transition-colors">
             <div
               class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4">
               <svg
@@ -180,7 +180,7 @@ const emit = defineEmits(["navigate", "go-to-rooms"]);
 
           <!-- Feature 6 -->
           <div
-            class="p-6 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors">
+            class="p-6 rounded-xl bg-white/2 border border-white/5 hover:border-white/10 transition-colors">
             <div
               class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4">
               <svg

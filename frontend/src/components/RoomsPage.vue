@@ -276,7 +276,7 @@ const roleOptions = [
         <div
           v-for="room in rooms"
           :key="room.id"
-          class="group flex items-center gap-4 p-4 rounded-lg bg-white/[0.02] border border-white/5 hover:border-white/10 hover:bg-white/[0.04] transition-all cursor-pointer"
+          class="group flex items-center gap-4 p-4 rounded-lg bg-white/2 border border-white/5 hover:border-white/10 hover:bg-white/4 transition-all cursor-pointer"
           @click="selectRoom(room)">
           <!-- Room Icon -->
           <div
