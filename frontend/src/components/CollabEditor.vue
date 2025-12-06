@@ -62,6 +62,20 @@
           </span>
         </span>
         <button
+          @click="downloadProject"
+          :disabled="isDownloading"
+          class="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
+          title="Download project as ZIP">
+          <svg v-if="!isDownloading" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <svg v-else class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          {{ isDownloading ? 'Exporting...' : 'Export ZIP' }}
+        </button>
+        <button
           @click="emit('logout')"
           class="px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors">
           Logout
@@ -177,6 +191,8 @@ import * as monaco from "monaco-editor";
 import * as Y from "yjs";
 import { MonacoBinding } from "y-monaco";
 import { emmetHTML, emmetCSS, emmetJSX } from "emmet-monaco-es";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 import FileExplorer from "./FileExplorer.vue";
 
 const props = defineProps({
@@ -199,6 +215,7 @@ const isConnected = ref(false);
 const typingCount = ref(0);
 const currentFile = ref(null);
 const showPreview = ref(false);
+const isDownloading = ref(false);
 
 // Use user data from props
 const userName = props.user.collab_user?.name || props.user.username;
@@ -568,6 +585,56 @@ function debouncedPreviewUpdate() {
 // Manual refresh preview
 function refreshPreview() {
   updatePreview();
+}
+
+// Download project as ZIP file
+async function downloadProject() {
+  if (isDownloading.value) return;
+  
+  isDownloading.value = true;
+  
+  try {
+    // Get all project files
+    const allFiles = await getAllProjectFiles();
+    
+    if (allFiles.length === 0) {
+      alert('No files to download');
+      return;
+    }
+    
+    // Create a new ZIP file
+    const zip = new JSZip();
+    
+    // Fetch content for each file and add to ZIP
+    for (const file of allFiles) {
+      const content = await fetchFileContent(file.id);
+      if (content !== null) {
+        // Use the full path for proper folder structure
+        zip.file(file.fullPath, content);
+      }
+    }
+    
+    // Generate the ZIP file
+    const blob = await zip.generateAsync({ 
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    });
+    
+    // Create filename with room name and timestamp
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const safeName = props.room.name.replace(/[^a-zA-Z0-9-_]/g, '_');
+    const filename = safeName + '_' + timestamp + '.zip';
+    
+    // Download the file
+    saveAs(blob, filename);
+    
+  } catch (error) {
+    console.error('Error downloading project:', error);
+    alert('Failed to download project: ' + error.message);
+  } finally {
+    isDownloading.value = false;
+  }
 }
 
 function broadcastAwareness(isTyping) {
