@@ -54,7 +54,15 @@ CHANNEL_LAYERS = {
 }
 
 # CORS settings for frontend
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+CORS_ALLOW_CREDENTIALS = True
+
+# Session settings
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_HTTPONLY = True
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',

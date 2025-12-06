@@ -25,12 +25,7 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
         print(f"Client connected: {self.channel_name}")
     
     async def disconnect(self, close_code):
-        # Leave the room group
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
-        # Remove cursor state for this connection and broadcast removal
+        # Remove cursor state for this connection and broadcast removal BEFORE leaving group
         client_id = getattr(self, 'client_id', None)
         if client_id and client_id in YjsSyncConsumer.cursor_states:
             del YjsSyncConsumer.cursor_states[client_id]
@@ -44,6 +39,12 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
                     "sender_channel": self.channel_name,
                 }
             )
+        
+        # Leave the room group AFTER broadcasting
+        await self.channel_layer.group_discard(
+            self.room_group_name,
+            self.channel_name
+        )
         print(f"Client disconnected: {self.channel_name}")
     
     async def receive(self, text_data=None, bytes_data=None):
