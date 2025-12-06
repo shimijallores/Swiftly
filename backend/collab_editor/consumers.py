@@ -12,6 +12,8 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
     room_group_name = "collab_room"  # Single global room
     # Store the document state in memory (shared across all connections)
     document_state = None
+    # Store cursor states for all connected users
+    cursor_states = {}
     
     async def connect(self):
         # Join the global room group
@@ -28,6 +30,20 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             self.channel_name
         )
+        # Remove cursor state for this connection and broadcast removal
+        client_id = getattr(self, 'client_id', None)
+        if client_id and client_id in YjsSyncConsumer.cursor_states:
+            del YjsSyncConsumer.cursor_states[client_id]
+            # Broadcast cursor removal to all clients
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    "type": "cursor_update",
+                    "clientId": client_id,
+                    "cursor": None,  # None indicates removal
+                    "sender_channel": self.channel_name,
+                }
+            )
         print(f"Client disconnected: {self.channel_name}")
     
     async def receive(self, text_data=None, bytes_data=None):
@@ -70,6 +86,32 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
                             "sender_channel": self.channel_name,
                         }
                     )
+                elif msg_type == 'cursor':
+                    # Store and broadcast cursor position
+                    client_id = message.get('clientId')
+                    self.client_id = client_id  # Store for disconnect handling
+                    cursor_data = {
+                        'name': message.get('name'),
+                        'color': message.get('color'),
+                        'position': message.get('position'),
+                        'selection': message.get('selection'),
+                    }
+                    YjsSyncConsumer.cursor_states[client_id] = cursor_data
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            "type": "cursor_update",
+                            "clientId": client_id,
+                            "cursor": cursor_data,
+                            "sender_channel": self.channel_name,
+                        }
+                    )
+                elif msg_type == 'cursor-sync-request':
+                    # Send all current cursor states to the requesting client
+                    await self.send(text_data=json.dumps({
+                        "type": "cursor-sync",
+                        "cursors": YjsSyncConsumer.cursor_states
+                    }))
             except json.JSONDecodeError:
                 print("Invalid JSON received")
     
@@ -94,4 +136,16 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
                 "type": "awareness",
                 "clientId": event.get("clientId"),
                 "state": event["state"]
+            }))
+    
+    async def cursor_update(self, event):
+        """
+        Receive cursor update from room group.
+        Send to WebSocket (but not back to sender).
+        """
+        if event.get("sender_channel") != self.channel_name:
+            await self.send(text_data=json.dumps({
+                "type": "cursor",
+                "clientId": event.get("clientId"),
+                "cursor": event.get("cursor")
             }))

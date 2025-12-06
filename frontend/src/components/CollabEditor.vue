@@ -7,16 +7,26 @@
         :class="isConnected ? 'text-green-500' : 'text-gray-400'">
         {{ isConnected ? "● Connected" : "○ Disconnected" }}
       </span>
+      <span class="text-blue-400">{{ userName }}</span>
       <span v-if="typingCount > 0" class="text-orange-400 italic">
         {{ typingCount }} user{{ typingCount > 1 ? "s" : "" }} typing...
       </span>
+      <div class="flex items-center gap-2 ml-auto">
+        <span
+          v-for="(cursor, id) in remoteCursors"
+          :key="id"
+          class="flex items-center gap-1 px-2 py-0.5 rounded text-white text-xs"
+          :style="{ backgroundColor: cursor.color }">
+          {{ cursor.name }}
+        </span>
+      </div>
     </div>
-    <div ref="editorContainer" class="flex-1 overflow-hidden"></div>
+    <div ref="editorContainer" class="flex-1 overflow-hidden relative"></div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, reactive, onMounted, onUnmounted } from "vue";
 import * as monaco from "monaco-editor";
 import * as Y from "yjs";
 import { MonacoBinding } from "y-monaco";
@@ -30,12 +40,23 @@ let ydoc = null;
 let ws = null;
 let binding = null;
 let typingTimeout = null;
+let cursorUpdateTimeout = null;
 
-// Generate a unique client ID
+// Generate a unique client ID and random user name
 const clientId = Math.random().toString(36).substring(2, 15);
+const userNames = ["Alice", "Bob", "Charlie", "Diana", "Eve", "Frank", "Grace", "Henry", "Ivy", "Jack"];
+const userName = userNames[Math.floor(Math.random() * userNames.length)] + Math.floor(Math.random() * 100);
+
+// Generate a random color for this user
+const userColors = ["#e91e63", "#9c27b0", "#673ab7", "#3f51b5", "#2196f3", "#00bcd4", "#009688", "#4caf50", "#ff9800", "#ff5722"];
+const userColor = userColors[Math.floor(Math.random() * userColors.length)];
 
 // Track remote users' typing states
 const remoteTypingStates = new Map();
+
+// Track remote cursors
+const remoteCursors = reactive({});
+const cursorDecorations = new Map(); // Map of clientId -> decoration IDs
 
 function broadcastAwareness(isTyping) {
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -47,6 +68,161 @@ function broadcastAwareness(isTyping) {
       })
     );
   }
+}
+
+function broadcastCursor() {
+  if (ws && ws.readyState === WebSocket.OPEN && editor) {
+    const position = editor.getPosition();
+    const selection = editor.getSelection();
+    ws.send(
+      JSON.stringify({
+        type: "cursor",
+        clientId: clientId,
+        name: userName,
+        color: userColor,
+        position: position ? { lineNumber: position.lineNumber, column: position.column } : null,
+        selection: selection ? {
+          startLineNumber: selection.startLineNumber,
+          startColumn: selection.startColumn,
+          endLineNumber: selection.endLineNumber,
+          endColumn: selection.endColumn,
+        } : null,
+      })
+    );
+  }
+}
+
+function updateRemoteCursor(remoteClientId, cursorData) {
+  if (!editor || !cursorData || remoteClientId === clientId) return;
+
+  // Remove cursor if null (user disconnected)
+  if (cursorData === null) {
+    delete remoteCursors[remoteClientId];
+    // Remove decorations
+    const oldDecorations = cursorDecorations.get(remoteClientId) || [];
+    editor.deltaDecorations(oldDecorations, []);
+    cursorDecorations.delete(remoteClientId);
+    // Remove cursor widget
+    removeCursorWidget(remoteClientId);
+    return;
+  }
+
+  // Update cursor state
+  remoteCursors[remoteClientId] = cursorData;
+
+  const { position, selection, color, name } = cursorData;
+  if (!position) return;
+
+  // Create decorations for cursor and selection
+  const decorations = [];
+
+  // Add selection decoration if there's a selection
+  if (selection && (selection.startLineNumber !== selection.endLineNumber || selection.startColumn !== selection.endColumn)) {
+    decorations.push({
+      range: new monaco.Range(
+        selection.startLineNumber,
+        selection.startColumn,
+        selection.endLineNumber,
+        selection.endColumn
+      ),
+      options: {
+        className: `remote-selection-${remoteClientId}`,
+        inlineClassName: `remote-selection-inline`,
+      },
+    });
+  }
+
+  // Update decorations
+  const oldDecorations = cursorDecorations.get(remoteClientId) || [];
+  const newDecorations = editor.deltaDecorations(oldDecorations, decorations);
+  cursorDecorations.set(remoteClientId, newDecorations);
+
+  // Update cursor widget (the line and name label)
+  updateCursorWidget(remoteClientId, position, color, name);
+
+  // Inject dynamic CSS for selection color
+  injectSelectionStyle(remoteClientId, color);
+}
+
+// Map to store cursor widgets
+const cursorWidgets = new Map();
+
+function updateCursorWidget(remoteClientId, position, color, name) {
+  // Remove existing widget if any
+  removeCursorWidget(remoteClientId);
+
+  // Create cursor widget
+  const cursorWidget = {
+    getId: () => `cursor-widget-${remoteClientId}`,
+    getDomNode: () => {
+      const container = document.createElement("div");
+      container.className = "remote-cursor-widget";
+      container.style.pointerEvents = "none";
+
+      // Cursor line
+      const cursorLine = document.createElement("div");
+      cursorLine.className = "remote-cursor-line";
+      cursorLine.style.backgroundColor = color;
+      cursorLine.style.width = "2px";
+      cursorLine.style.height = "18px";
+      cursorLine.style.position = "absolute";
+      cursorLine.style.top = "0";
+      cursorLine.style.left = "0";
+
+      // Name label
+      const nameLabel = document.createElement("div");
+      nameLabel.className = "remote-cursor-name";
+      nameLabel.textContent = name;
+      nameLabel.style.backgroundColor = color;
+      nameLabel.style.color = "white";
+      nameLabel.style.fontSize = "10px";
+      nameLabel.style.padding = "1px 4px";
+      nameLabel.style.borderRadius = "2px";
+      nameLabel.style.position = "absolute";
+      nameLabel.style.top = "-16px";
+      nameLabel.style.left = "0";
+      nameLabel.style.whiteSpace = "nowrap";
+      nameLabel.style.zIndex = "100";
+
+      container.appendChild(cursorLine);
+      container.appendChild(nameLabel);
+      return container;
+    },
+    getPosition: () => ({
+      position: { lineNumber: position.lineNumber, column: position.column },
+      preference: [monaco.editor.ContentWidgetPositionPreference.EXACT],
+    }),
+  };
+
+  editor.addContentWidget(cursorWidget);
+  cursorWidgets.set(remoteClientId, cursorWidget);
+}
+
+function removeCursorWidget(remoteClientId) {
+  const widget = cursorWidgets.get(remoteClientId);
+  if (widget) {
+    editor.removeContentWidget(widget);
+    cursorWidgets.delete(remoteClientId);
+  }
+}
+
+function injectSelectionStyle(remoteClientId, color) {
+  const styleId = `remote-selection-style-${remoteClientId}`;
+  let styleEl = document.getElementById(styleId);
+  if (!styleEl) {
+    styleEl = document.createElement("style");
+    styleEl.id = styleId;
+    document.head.appendChild(styleEl);
+  }
+  // Convert hex to rgba with transparency
+  const r = parseInt(color.slice(1, 3), 16);
+  const g = parseInt(color.slice(3, 5), 16);
+  const b = parseInt(color.slice(5, 7), 16);
+  styleEl.textContent = `
+    .remote-selection-${remoteClientId} {
+      background-color: rgba(${r}, ${g}, ${b}, 0.3) !important;
+    }
+  `;
 }
 
 function updateTypingCount() {
@@ -112,6 +288,27 @@ onMounted(() => {
     }, 1000);
   });
 
+  // Track cursor position changes
+  editor.onDidChangeCursorPosition(() => {
+    // Debounce cursor updates
+    if (cursorUpdateTimeout) {
+      clearTimeout(cursorUpdateTimeout);
+    }
+    cursorUpdateTimeout = setTimeout(() => {
+      broadcastCursor();
+    }, 50);
+  });
+
+  // Track selection changes
+  editor.onDidChangeCursorSelection(() => {
+    if (cursorUpdateTimeout) {
+      clearTimeout(cursorUpdateTimeout);
+    }
+    cursorUpdateTimeout = setTimeout(() => {
+      broadcastCursor();
+    }, 50);
+  });
+
   // Periodically clean up stale typing states
   setInterval(updateTypingCount, 500);
 });
@@ -125,6 +322,10 @@ function connectWebSocket() {
 
     // Request sync from server
     ws.send(JSON.stringify({ type: "sync-request" }));
+    // Request cursor states from server
+    ws.send(JSON.stringify({ type: "cursor-sync-request" }));
+    // Broadcast our cursor position
+    setTimeout(broadcastCursor, 100);
   };
 
   ws.onclose = () => {
@@ -169,6 +370,20 @@ function connectWebSocket() {
           });
           updateTypingCount();
         }
+      } else if (message.type === "cursor") {
+        // Update remote cursor
+        const remoteClientId = message.clientId;
+        if (remoteClientId && remoteClientId !== clientId) {
+          updateRemoteCursor(remoteClientId, message.cursor);
+        }
+      } else if (message.type === "cursor-sync") {
+        // Sync all cursor states
+        const cursors = message.cursors || {};
+        for (const [id, cursor] of Object.entries(cursors)) {
+          if (id !== clientId) {
+            updateRemoteCursor(id, cursor);
+          }
+        }
       }
     } catch (e) {
       console.error("Error processing message:", e);
@@ -182,5 +397,19 @@ onUnmounted(() => {
   if (ydoc) ydoc.destroy();
   if (editor) editor.dispose();
   if (typingTimeout) clearTimeout(typingTimeout);
+  if (cursorUpdateTimeout) clearTimeout(cursorUpdateTimeout);
+  // Clean up cursor widgets and styles
+  for (const id of cursorWidgets.keys()) {
+    removeCursorWidget(id);
+    const styleEl = document.getElementById(`remote-selection-style-${id}`);
+    if (styleEl) styleEl.remove();
+  }
 });
 </script>
+
+<style>
+.remote-cursor-widget {
+  position: relative;
+  z-index: 100;
+}
+</style>
