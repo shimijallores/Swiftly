@@ -11,4 +11,13 @@ urlpatterns = [
     # CollabUser endpoints
     path('api/user/', views.get_or_create_user, name='get_or_create_user'),
     path('api/user/<str:client_id>/', views.update_user, name='update_user'),
+    
+    # Virtual file system endpoints
+    path('api/files/', views.file_tree_view, name='file_tree'),
+    path('api/files/content/', views.file_content_view, name='file_content'),
+    path('api/files/create/', views.file_create_view, name='file_create'),
+    path('api/files/<uuid:file_id>/', views.file_update_view, name='file_update'),
+    path('api/files/<uuid:file_id>/rename/', views.file_rename_view, name='file_rename'),
+    path('api/files/<uuid:file_id>/delete/', views.file_delete_view, name='file_delete'),
+    path('api/files/<uuid:file_id>/move/', views.file_move_view, name='file_move'),
 ]

@@ -12,9 +12,9 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
     """
     
     room_group_name = "collab_room"  # Single global room
-    # Store all document updates in memory (shared across all connections)
-    document_updates = []  # List of base64 encoded updates
-    # Store cursor states for all connected users
+    # Store document updates per file (shared across all connections)
+    file_updates = {}  # Dict of fileId -> List of base64 encoded updates
+    # Store cursor states for all connected users (includes file info)
     cursor_states = {}
     
     @database_sync_to_async
@@ -43,11 +43,6 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
             print(f"Error saving document: {e}")
     
     async def connect(self):
-        # Load document updates from DB if not in memory
-        if not YjsSyncConsumer.document_updates:
-            YjsSyncConsumer.document_updates = await self.load_document_updates()
-            print(f"Loaded {len(YjsSyncConsumer.document_updates)} updates from DB")
-        
         # Join the global room group
         await self.channel_layer.group_add(
             self.room_group_name,
@@ -89,30 +84,60 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
                 msg_type = message.get('type')
                 
                 if msg_type == 'yjs-update':
-                    # Add update to the list
+                    # Add update to the file-specific list
                     update_data = message.get('data')
-                    YjsSyncConsumer.document_updates.append(update_data)
+                    file_id = message.get('fileId')
                     
-                    # Save all updates to database
-                    await self.save_document_updates(YjsSyncConsumer.document_updates)
+                    if file_id:
+                        if file_id not in YjsSyncConsumer.file_updates:
+                            YjsSyncConsumer.file_updates[file_id] = []
+                        YjsSyncConsumer.file_updates[file_id].append(update_data)
                     
-                    # Broadcast the Yjs update to all clients in the room
+                    # Broadcast the Yjs update to all clients in the room (with fileId)
                     await self.channel_layer.group_send(
                         self.room_group_name,
                         {
                             "type": "yjs_update",
                             "data": update_data,
+                            "fileId": file_id,
                             "sender_channel": self.channel_name,
                         }
                     )
                 elif msg_type == 'sync-request':
-                    # Send all stored updates to the requesting client
-                    if YjsSyncConsumer.document_updates:
-                        for update in YjsSyncConsumer.document_updates:
+                    # Sync requests are now per-file, handled on frontend
+                    pass
+                elif msg_type == 'file-sync-request':
+                    # Send all stored updates for a specific file
+                    file_id = message.get('fileId')
+                    has_updates = file_id and file_id in YjsSyncConsumer.file_updates and len(YjsSyncConsumer.file_updates[file_id]) > 0
+                    
+                    if has_updates:
+                        for update in YjsSyncConsumer.file_updates[file_id]:
                             await self.send(text_data=json.dumps({
                                 "type": "yjs-state",
+                                "fileId": file_id,
                                 "data": update
                             }))
+                    
+                    # Always send sync-complete so client knows whether to init from DB
+                    await self.send(text_data=json.dumps({
+                        "type": "file-sync-complete",
+                        "fileId": file_id,
+                        "hasUpdates": has_updates
+                    }))
+                elif msg_type == 'file-change':
+                    # Broadcast file change to all other clients
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            "type": "file_change",
+                            "clientId": message.get('clientId'),
+                            "fileId": message.get('fileId'),
+                            "fileName": message.get('fileName'),
+                            "filePath": message.get('filePath'),
+                            "sender_channel": self.channel_name,
+                        }
+                    )
                 elif msg_type == 'awareness':
                     # Broadcast awareness (typing indicator) to all other clients
                     await self.channel_layer.group_send(
@@ -125,7 +150,7 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
                         }
                     )
                 elif msg_type == 'cursor':
-                    # Store and broadcast cursor position
+                    # Store and broadcast cursor position with file info
                     client_id = message.get('clientId')
                     self.client_id = client_id  # Store for disconnect handling
                     cursor_data = {
@@ -133,6 +158,9 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
                         'color': message.get('color'),
                         'position': message.get('position'),
                         'selection': message.get('selection'),
+                        'fileId': message.get('fileId'),
+                        'fileName': message.get('fileName'),
+                        'filePath': message.get('filePath'),
                     }
                     YjsSyncConsumer.cursor_states[client_id] = cursor_data
                     await self.channel_layer.group_send(
@@ -141,6 +169,9 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
                             "type": "cursor_update",
                             "clientId": client_id,
                             "cursor": cursor_data,
+                            "fileId": message.get('fileId'),
+                            "fileName": message.get('fileName'),
+                            "filePath": message.get('filePath'),
                             "sender_channel": self.channel_name,
                         }
                     )
@@ -161,6 +192,7 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
         if event.get("sender_channel") != self.channel_name:
             await self.send(text_data=json.dumps({
                 "type": "yjs-update",
+                "fileId": event.get("fileId"),
                 "data": event["data"]
             }))
     
@@ -185,5 +217,22 @@ class YjsSyncConsumer(AsyncWebsocketConsumer):
             await self.send(text_data=json.dumps({
                 "type": "cursor",
                 "clientId": event.get("clientId"),
-                "cursor": event.get("cursor")
+                "cursor": event.get("cursor"),
+                "fileId": event.get("fileId"),
+                "fileName": event.get("fileName"),
+                "filePath": event.get("filePath"),
+            }))
+
+    async def file_change(self, event):
+        """
+        Receive file change notification from room group.
+        Send to WebSocket (but not back to sender).
+        """
+        if event.get("sender_channel") != self.channel_name:
+            await self.send(text_data=json.dumps({
+                "type": "file-change",
+                "clientId": event.get("clientId"),
+                "fileId": event.get("fileId"),
+                "fileName": event.get("fileName"),
+                "filePath": event.get("filePath"),
             }))

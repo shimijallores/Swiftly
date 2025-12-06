@@ -12,6 +12,9 @@
         :style="{ backgroundColor: userColor }">
         {{ userName }}
       </span>
+      <span v-if="currentFile" class="text-gray-500">
+        {{ currentFile.path }}
+      </span>
       <span v-if="typingCount > 0" class="text-orange-400 italic">
         {{ typingCount }} user{{ typingCount > 1 ? "s" : "" }} typing...
       </span>
@@ -20,8 +23,14 @@
           v-for="(cursor, id) in remoteCursors"
           :key="id"
           class="flex items-center gap-1 px-2 py-0.5 rounded text-white text-xs"
-          :style="{ backgroundColor: cursor.color }">
+          :style="{ backgroundColor: cursor.color }"
+          :title="
+            cursor.filePath ? `Editing: ${cursor.filePath}` : 'No file open'
+          ">
           {{ cursor.name }}
+          <span v-if="cursor.fileName" class="text-[10px] opacity-75">
+            ({{ cursor.fileName }})
+          </span>
         </span>
         <button
           @click="emit('logout')"
@@ -30,7 +39,14 @@
         </button>
       </div>
     </div>
-    <div ref="editorContainer" class="flex-1 overflow-hidden relative"></div>
+    <div class="flex flex-1 overflow-hidden">
+      <!-- File Explorer Sidebar -->
+      <div class="w-64 flex-shrink-0 border-r border-gray-700">
+        <FileExplorer @file-select="handleFileSelect" />
+      </div>
+      <!-- Editor -->
+      <div ref="editorContainer" class="flex-1 overflow-hidden relative"></div>
+    </div>
   </div>
 </template>
 
@@ -39,6 +55,7 @@ import { ref, reactive, onMounted, onUnmounted } from "vue";
 import * as monaco from "monaco-editor";
 import * as Y from "yjs";
 import { MonacoBinding } from "y-monaco";
+import FileExplorer from "./FileExplorer.vue";
 
 const props = defineProps({
   user: {
@@ -52,6 +69,7 @@ const emit = defineEmits(["logout"]);
 const editorContainer = ref(null);
 const isConnected = ref(false);
 const typingCount = ref(0);
+const currentFile = ref(null);
 
 // Use user data from props
 const userName = props.user.collab_user?.name || props.user.username;
@@ -64,6 +82,8 @@ let ws = null;
 let binding = null;
 let typingTimeout = null;
 let cursorUpdateTimeout = null;
+let saveTimeout = null;
+let currentFileId = null; // Track current file for per-file sync
 
 // Track remote users' typing states
 const remoteTypingStates = new Map();
@@ -71,6 +91,147 @@ const remoteTypingStates = new Map();
 // Track remote cursors
 const remoteCursors = reactive({});
 const cursorDecorations = new Map(); // Map of clientId -> decoration IDs
+
+// Get language from file extension
+function getLanguageFromPath(path) {
+  if (!path) return "plaintext";
+  const ext = path.split(".").pop().toLowerCase();
+  const langMap = {
+    js: "javascript",
+    ts: "typescript",
+    vue: "html",
+    py: "python",
+    json: "json",
+    md: "markdown",
+    html: "html",
+    css: "css",
+    scss: "scss",
+    xml: "xml",
+    yaml: "yaml",
+    yml: "yaml",
+  };
+  return langMap[ext] || "plaintext";
+}
+
+// Track pending file sync responses
+let pendingFileSync = null;
+
+// Handle file selection from explorer
+function handleFileSelect(file) {
+  if (!file) {
+    currentFile.value = null;
+    currentFileId = null;
+    pendingFileSync = null;
+    if (editor && binding) {
+      binding.destroy();
+      binding = null;
+      editor.getModel()?.setValue("");
+    }
+    // Broadcast that we're not editing any file
+    broadcastFileChange(null);
+    return;
+  }
+
+  currentFile.value = file;
+  currentFileId = file.id;
+
+  if (editor) {
+    // Destroy previous binding if exists
+    if (binding) {
+      binding.destroy();
+      binding = null;
+    }
+
+    // Get or create a Yjs text for this specific file
+    const ytext = ydoc.getText(`file-${file.id}`);
+
+    // Set the editor language and clear content
+    const model = editor.getModel();
+    if (model) {
+      monaco.editor.setModelLanguage(model, getLanguageFromPath(file.path));
+      model.setValue(""); // Clear while loading
+    }
+
+    // If Yjs already has content for this file (from earlier in this session), use it
+    if (ytext.length > 0) {
+      binding = new MonacoBinding(ytext, editor.getModel(), new Set([editor]));
+      pendingFileSync = null;
+    } else {
+      // Create binding with empty ytext
+      binding = new MonacoBinding(ytext, editor.getModel(), new Set([editor]));
+
+      // Mark that we're waiting for server sync
+      pendingFileSync = {
+        fileId: file.id,
+        fileContent: file.content || "",
+      };
+
+      // Request any stored Yjs updates for this file from the server
+      // Server will respond with file-sync-complete when done
+      requestFileSync(file.id);
+    }
+  }
+
+  // Broadcast which file we're now editing
+  broadcastFileChange(file.id);
+}
+
+// Request Yjs state for a specific file from the server
+function requestFileSync(fileId) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(
+      JSON.stringify({
+        type: "file-sync-request",
+        fileId: fileId,
+      })
+    );
+  }
+}
+
+// Broadcast file change to other users
+function broadcastFileChange(fileId) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(
+      JSON.stringify({
+        type: "file-change",
+        clientId: clientId,
+        fileId: fileId,
+        fileName: currentFile.value?.name || null,
+        filePath: currentFile.value?.path || null,
+      })
+    );
+  }
+}
+
+// Save file content to server with debounce
+function saveFileContent() {
+  if (!currentFile.value || !editor) return;
+
+  const content = editor.getValue();
+
+  fetch(`http://localhost:8000/api/files/${currentFile.value.id}/`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  })
+    .then((res) => {
+      if (res.ok) {
+        console.log("File saved");
+      }
+    })
+    .catch((err) => console.error("Save failed:", err));
+}
+
+// Debounced save (2 seconds)
+function debouncedSave() {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+  }
+  saveTimeout = setTimeout(() => {
+    saveFileContent();
+  }, 2000);
+}
 
 function broadcastAwareness(isTyping) {
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -94,6 +255,9 @@ function broadcastCursor() {
         clientId: clientId,
         name: userName,
         color: userColor,
+        fileId: currentFileId,
+        fileName: currentFile.value?.name || null,
+        filePath: currentFile.value?.path || null,
         position: position
           ? { lineNumber: position.lineNumber, column: position.column }
           : null,
@@ -130,11 +294,22 @@ function updateRemoteCursor(remoteClientId, cursorData) {
 
   if (!cursorData) return;
 
-  // Update cursor state
+  // Update cursor state (always store for status bar display)
   remoteCursors[remoteClientId] = cursorData;
 
-  const { position, selection, color, name } = cursorData;
-  if (!position) return;
+  const { position, selection, color, name, fileId } = cursorData;
+
+  // Only show cursor decorations if user is on the same file
+  const sameFile = fileId && fileId === currentFileId;
+
+  if (!position || !sameFile) {
+    // Remove decorations if not on same file
+    const oldDecorations = cursorDecorations.get(remoteClientId) || [];
+    editor.deltaDecorations(oldDecorations, []);
+    cursorDecorations.delete(remoteClientId);
+    removeCursorWidget(remoteClientId);
+    return;
+  }
 
   // Create decorations for cursor and selection
   const decorations = [];
@@ -267,7 +442,6 @@ function updateTypingCount() {
 onMounted(() => {
   // Initialize Yjs document
   ydoc = new Y.Doc();
-  const ytext = ydoc.getText("monaco");
 
   // Connect to Django WebSocket
   connectWebSocket();
@@ -285,26 +459,34 @@ onMounted(() => {
     scrollBeyondLastLine: false,
   });
 
-  // Bind Yjs to Monaco (without awareness for now)
-  binding = new MonacoBinding(ytext, editor.getModel(), new Set([editor]));
+  // No initial binding - will be created when file is selected
 
   // Listen for Yjs updates and broadcast them
   ydoc.on("update", (update, origin) => {
-    if (origin !== "remote" && ws && ws.readyState === WebSocket.OPEN) {
-      // Send update as base64 encoded string
+    if (
+      origin !== "remote" &&
+      ws &&
+      ws.readyState === WebSocket.OPEN &&
+      currentFileId
+    ) {
+      // Send update as base64 encoded string with file ID
       const base64 = btoa(String.fromCharCode(...update));
       ws.send(
         JSON.stringify({
           type: "yjs-update",
+          fileId: currentFileId,
           data: base64,
         })
       );
     }
   });
 
-  // Track typing activity
+  // Track typing activity and auto-save
   editor.onDidChangeModelContent(() => {
     broadcastAwareness(true);
+
+    // Trigger debounced save
+    debouncedSave();
 
     if (typingTimeout) {
       clearTimeout(typingTimeout);
@@ -372,21 +554,26 @@ function connectWebSocket() {
       const message = JSON.parse(event.data);
 
       if (message.type === "yjs-update") {
-        // Decode base64 and apply update
-        const binary = atob(message.data);
-        const update = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-          update[i] = binary.charCodeAt(i);
+        // Only apply updates for the same file we're editing
+        if (message.fileId && message.fileId === currentFileId) {
+          // Decode base64 and apply update
+          const binary = atob(message.data);
+          const update = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            update[i] = binary.charCodeAt(i);
+          }
+          Y.applyUpdate(ydoc, update, "remote");
         }
-        Y.applyUpdate(ydoc, update, "remote");
       } else if (message.type === "yjs-state") {
-        // Apply full state
-        const binary = atob(message.data);
-        const state = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-          state[i] = binary.charCodeAt(i);
+        // Apply stored state from server (only if for the same file)
+        if (message.fileId && message.fileId === currentFileId) {
+          const binary = atob(message.data);
+          const state = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            state[i] = binary.charCodeAt(i);
+          }
+          Y.applyUpdate(ydoc, state, "remote");
         }
-        Y.applyUpdate(ydoc, state, "remote");
       } else if (message.type === "awareness") {
         // Update typing indicator from remote user
         const remoteClientId = message.clientId;
@@ -398,10 +585,15 @@ function connectWebSocket() {
           updateTypingCount();
         }
       } else if (message.type === "cursor") {
-        // Update remote cursor
+        // Update remote cursor with file info
         const remoteClientId = message.clientId;
         if (remoteClientId && remoteClientId !== clientId) {
-          updateRemoteCursor(remoteClientId, message.cursor);
+          updateRemoteCursor(remoteClientId, {
+            ...message.cursor,
+            fileId: message.fileId,
+            fileName: message.fileName,
+            filePath: message.filePath,
+          });
         }
       } else if (message.type === "cursor-sync") {
         // Sync all cursor states
@@ -410,6 +602,30 @@ function connectWebSocket() {
           if (id !== clientId) {
             updateRemoteCursor(id, cursor);
           }
+        }
+      } else if (message.type === "file-change") {
+        // Update remote user's file info
+        const remoteClientId = message.clientId;
+        if (remoteClientId && remoteClientId !== clientId) {
+          // Update cursor info with new file
+          if (remoteCursors[remoteClientId]) {
+            remoteCursors[remoteClientId].fileId = message.fileId;
+            remoteCursors[remoteClientId].fileName = message.fileName;
+            remoteCursors[remoteClientId].filePath = message.filePath;
+          }
+        }
+      } else if (message.type === "file-sync-complete") {
+        // Server finished sending stored updates for the file
+        const fileId = message.fileId;
+        if (pendingFileSync && pendingFileSync.fileId === fileId) {
+          if (!message.hasUpdates) {
+            // No updates on server - initialize with DB content
+            const ytext = ydoc.getText(`file-${fileId}`);
+            if (ytext.length === 0 && pendingFileSync.fileContent) {
+              ytext.insert(0, pendingFileSync.fileContent);
+            }
+          }
+          pendingFileSync = null;
         }
       }
     } catch (e) {
@@ -425,6 +641,7 @@ onUnmounted(() => {
   if (editor) editor.dispose();
   if (typingTimeout) clearTimeout(typingTimeout);
   if (cursorUpdateTimeout) clearTimeout(cursorUpdateTimeout);
+  if (saveTimeout) clearTimeout(saveTimeout);
   // Clean up cursor widgets and styles
   for (const id of cursorWidgets.keys()) {
     removeCursorWidget(id);

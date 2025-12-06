@@ -1,5 +1,6 @@
 from django.db import models
 import random
+import uuid
 
 
 class Document(models.Model):
@@ -23,6 +24,98 @@ class Document(models.Model):
     def get_or_create_document(cls, room_id='default'):
         doc, created = cls.objects.get_or_create(room_id=room_id)
         return doc
+
+
+class VirtualFile(models.Model):
+    """
+    Virtual filesystem stored in database.
+    Each file/folder belongs to a room (project).
+    """
+    FILE = 'file'
+    FOLDER = 'folder'
+    TYPE_CHOICES = [
+        (FILE, 'File'),
+        (FOLDER, 'Folder'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    room_id = models.CharField(max_length=100, db_index=True, default='default')
+    name = models.CharField(max_length=255)
+    type = models.CharField(max_length=10, choices=TYPE_CHOICES, default=FILE)
+    parent = models.ForeignKey(
+        'self', 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True, 
+        related_name='children'
+    )
+    content = models.TextField(blank=True, default='')  # Only for files
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Virtual File"
+        verbose_name_plural = "Virtual Files"
+        # Prevent duplicate names in the same folder
+        unique_together = ['room_id', 'parent', 'name']
+        ordering = ['type', 'name']  # Folders first, then alphabetically
+
+    def __str__(self):
+        return f"{self.name} ({'📁' if self.type == self.FOLDER else '📄'})"
+
+    @property
+    def path(self):
+        """Get full path from root."""
+        if self.parent:
+            return f"{self.parent.path}/{self.name}"
+        return self.name
+
+    def to_dict(self, include_children=False):
+        """Convert to dictionary for JSON serialization."""
+        data = {
+            'id': str(self.id),
+            'name': self.name,
+            'type': self.type,
+            'path': self.path,
+            'parentId': str(self.parent.id) if self.parent else None,
+        }
+        if self.type == self.FILE:
+            data['updatedAt'] = self.updated_at.isoformat()
+        if include_children and self.type == self.FOLDER:
+            data['children'] = [
+                child.to_dict(include_children=True) 
+                for child in self.children.all().order_by('type', 'name')
+            ]
+        return data
+
+    @classmethod
+    def get_tree(cls, room_id='default'):
+        """Get full file tree for a room."""
+        roots = cls.objects.filter(room_id=room_id, parent=None).order_by('type', 'name')
+        return [root.to_dict(include_children=True) for root in roots]
+
+    @classmethod
+    def create_default_structure(cls, room_id='default'):
+        """Create a default project structure for a new room."""
+        # Check if room already has files
+        if cls.objects.filter(room_id=room_id).exists():
+            return
+        
+        # Create default structure
+        src = cls.objects.create(room_id=room_id, name='src', type=cls.FOLDER)
+        cls.objects.create(
+            room_id=room_id, 
+            name='main.js', 
+            type=cls.FILE, 
+            parent=src,
+            content='// Welcome to Swiftly!\nconsole.log("Hello, World!");\n'
+        )
+        cls.objects.create(
+            room_id=room_id, 
+            name='README.md', 
+            type=cls.FILE,
+            content='# My Project\n\nWelcome to your collaborative project!\n'
+        )
 
 
 class CollabUser(models.Model):
