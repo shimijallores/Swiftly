@@ -5,6 +5,7 @@ import AuthPage from "./components/AuthPage.vue";
 import Navbar from "./components/Navbar.vue";
 import HomePage from "./components/HomePage.vue";
 import RoomsPage from "./components/RoomsPage.vue";
+import { apiUrl } from "@/lib/api";
 
 const user = ref(null);
 const loading = ref(true);
@@ -15,7 +16,7 @@ const showAuth = ref(false);
 // Check if user is already logged in
 async function checkAuth() {
   try {
-    const response = await fetch("http://localhost:8000/api/auth/me/", {
+    const response = await fetch(apiUrl("/api/auth/me/"), {
       credentials: "include",
     });
     if (response.ok) {
@@ -36,7 +37,7 @@ function handleAuth(userData) {
 
 async function handleLogout() {
   try {
-    await fetch("http://localhost:8000/api/auth/logout/", {
+    await fetch(apiUrl("/api/auth/logout/"), {
       method: "POST",
       credentials: "include",
     });

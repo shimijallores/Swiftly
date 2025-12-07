@@ -25,7 +25,9 @@ SECRET_KEY = 'django-insecure-6l-%9801vewspt6a2x0kpd-ee*&^72!p+8=u7^p$rh&%&)0#-p
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# Allow connections from any host in development
+# In production, you should set this to your actual domain(s)
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -54,15 +56,24 @@ CHANNEL_LAYERS = {
 }
 
 # CORS settings for frontend
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+# In development, allow all origins to support LAN access
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
-# Session settings
+# Session settings - configured for LAN access
+# Using Lax for better compatibility without HTTPS
 SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = False
 SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_DOMAIN = None  # Allow cookie for any domain
+
+# CSRF settings for LAN access
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = False
+CSRF_TRUSTED_ORIGINS = ['http://*:5173', 'http://*:8000']
+
+# Disable CSRF for API endpoints (since we're using session auth in dev)
+CSRF_COOKIE_HTTPONLY = False
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',

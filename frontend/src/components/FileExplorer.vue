@@ -119,6 +119,7 @@
 <script setup>
 import { ref, onMounted, nextTick, watch } from "vue";
 import FileTreeNode from "./FileTreeNode.vue";
+import { apiUrl } from "@/lib/api";
 
 const props = defineProps({
   roomId: {
@@ -156,7 +157,7 @@ async function fetchFileTree() {
     loading.value = true;
     error.value = null;
     const response = await fetch(
-      `http://localhost:8000/api/files/?room_id=${props.roomId}`,
+      apiUrl(`/api/files/?room_id=${props.roomId}`),
       {
         credentials: "include",
       }
@@ -177,7 +178,7 @@ async function handleSelect(node) {
   if (node.type === "file") {
     try {
       const response = await fetch(
-        `http://localhost:8000/api/files/content/?id=${node.id}`,
+        apiUrl(`/api/files/content/?id=${node.id}`),
         { credentials: "include" }
       );
       if (!response.ok) throw new Error("Failed to fetch file content");
@@ -202,7 +203,7 @@ async function createNewItem() {
   }
 
   try {
-    const response = await fetch("http://localhost:8000/api/files/create/", {
+    const response = await fetch(apiUrl("/api/files/create/"), {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -237,7 +238,7 @@ function cancelNewItem() {
 
 async function handleCreate({ parentId, name, type }) {
   try {
-    const response = await fetch("http://localhost:8000/api/files/create/", {
+    const response = await fetch(apiUrl("/api/files/create/"), {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -265,15 +266,12 @@ async function handleCreate({ parentId, name, type }) {
 
 async function handleRename({ id, newName }) {
   try {
-    const response = await fetch(
-      `http://localhost:8000/api/files/${id}/rename/`,
-      {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName }),
-      }
-    );
+    const response = await fetch(apiUrl(`/api/files/${id}/rename/`), {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName }),
+    });
 
     if (!response.ok) {
       const data = await response.json();
@@ -292,13 +290,10 @@ async function handleDelete({ id }) {
   if (!confirm("Are you sure you want to delete this?")) return;
 
   try {
-    const response = await fetch(
-      `http://localhost:8000/api/files/${id}/delete/`,
-      {
-        method: "DELETE",
-        credentials: "include",
-      }
-    );
+    const response = await fetch(apiUrl(`/api/files/${id}/delete/`), {
+      method: "DELETE",
+      credentials: "include",
+    });
 
     if (!response.ok) {
       const data = await response.json();

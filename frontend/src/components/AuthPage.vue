@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { apiUrl } from "@/lib/api";
 
 const emit = defineEmits(["login", "register", "home"]);
 
@@ -21,7 +22,7 @@ async function handleLogin() {
   loading.value = true;
 
   try {
-    const response = await fetch("http://localhost:8000/api/auth/login/", {
+    const response = await fetch(apiUrl("/api/auth/login/"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -61,7 +62,7 @@ async function handleRegister() {
   loading.value = true;
 
   try {
-    const response = await fetch("http://localhost:8000/api/auth/register/", {
+    const response = await fetch(apiUrl("/api/auth/register/"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",

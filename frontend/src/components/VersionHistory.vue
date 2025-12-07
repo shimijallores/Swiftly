@@ -233,6 +233,7 @@
 
 <script setup>
 import { ref, computed, watch } from "vue";
+import { apiUrl } from "@/lib/api";
 
 const props = defineProps({
   currentFile: {
@@ -287,7 +288,7 @@ async function loadSnapshots() {
   isLoading.value = true;
   try {
     const response = await fetch(
-      `http://localhost:8000/api/files/${props.currentFile.id}/snapshots/`,
+      apiUrl(`/api/files/${props.currentFile.id}/snapshots/`),
       { credentials: "include" }
     );
     if (response.ok) {
@@ -306,10 +307,9 @@ async function selectSnapshot(snapshot) {
   previewContent.value = null;
 
   try {
-    const response = await fetch(
-      `http://localhost:8000/api/snapshots/${snapshot.id}/`,
-      { credentials: "include" }
-    );
+    const response = await fetch(apiUrl(`/api/snapshots/${snapshot.id}/`), {
+      credentials: "include",
+    });
     if (response.ok) {
       const data = await response.json();
       previewContent.value = data.content;
@@ -325,7 +325,7 @@ async function restoreSnapshot() {
   isRestoring.value = true;
   try {
     const response = await fetch(
-      `http://localhost:8000/api/snapshots/${selectedSnapshot.value.id}/restore/`,
+      apiUrl(`/api/snapshots/${selectedSnapshot.value.id}/restore/`),
       {
         method: "POST",
         credentials: "include",

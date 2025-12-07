@@ -13,6 +13,7 @@ import {
   DialogContent,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { apiUrl } from "@/lib/api";
 
 const emit = defineEmits(["select-room"]);
 
@@ -42,7 +43,7 @@ async function fetchRooms() {
   loading.value = true;
   error.value = null;
   try {
-    const res = await fetch("http://localhost:8000/api/rooms/", {
+    const res = await fetch(apiUrl("/api/rooms/"), {
       credentials: "include",
     });
     if (!res.ok) throw new Error("Failed to fetch rooms");
@@ -59,7 +60,7 @@ async function createRoom() {
   formLoading.value = true;
   formError.value = null;
   try {
-    const res = await fetch("http://localhost:8000/api/rooms/", {
+    const res = await fetch(apiUrl("/api/rooms/"), {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -81,7 +82,7 @@ async function joinRoom() {
   formLoading.value = true;
   formError.value = null;
   try {
-    const res = await fetch("http://localhost:8000/api/rooms/join/", {
+    const res = await fetch(apiUrl("/api/rooms/join/"), {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -107,10 +108,10 @@ async function joinRoom() {
 async function leaveRoom(room) {
   if (!confirm(`Leave "${room.name}"?`)) return;
   try {
-    const res = await fetch(
-      `http://localhost:8000/api/rooms/${room.id}/leave/`,
-      { method: "POST", credentials: "include" }
-    );
+    const res = await fetch(apiUrl(`/api/rooms/${room.id}/leave/`), {
+      method: "POST",
+      credentials: "include",
+    });
     if (!res.ok) {
       const data = await res.json();
       throw new Error(data.error || "Failed to leave room");
@@ -124,7 +125,7 @@ async function leaveRoom(room) {
 async function deleteRoom(room) {
   if (!confirm(`Delete "${room.name}"? This cannot be undone.`)) return;
   try {
-    const res = await fetch(`http://localhost:8000/api/rooms/${room.id}/`, {
+    const res = await fetch(apiUrl(`/api/rooms/${room.id}/`), {
       method: "DELETE",
       credentials: "include",
     });
@@ -146,7 +147,7 @@ function openMembersDialog(room) {
 
 async function fetchRoomDetails(roomId) {
   try {
-    const res = await fetch(`http://localhost:8000/api/rooms/${roomId}/`, {
+    const res = await fetch(apiUrl(`/api/rooms/${roomId}/`), {
       credentials: "include",
     });
     if (!res.ok) throw new Error("Failed to fetch room details");
@@ -160,7 +161,7 @@ async function fetchRoomDetails(roomId) {
 async function changeRole(member, newRole) {
   try {
     const res = await fetch(
-      `http://localhost:8000/api/rooms/${selectedRoom.value.id}/members/${member.id}/role/`,
+      apiUrl(`/api/rooms/${selectedRoom.value.id}/members/${member.id}/role/`),
       {
         method: "PUT",
         credentials: "include",
@@ -182,7 +183,7 @@ async function kickMember(member) {
   if (!confirm(`Remove ${member.username}?`)) return;
   try {
     const res = await fetch(
-      `http://localhost:8000/api/rooms/${selectedRoom.value.id}/members/${member.id}/kick/`,
+      apiUrl(`/api/rooms/${selectedRoom.value.id}/members/${member.id}/kick/`),
       { method: "DELETE", credentials: "include" }
     );
     if (!res.ok) {

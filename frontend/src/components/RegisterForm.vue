@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { apiUrl } from "@/lib/api";
 
 const emit = defineEmits(["register", "switchToLogin"]);
 
@@ -37,7 +38,7 @@ async function handleSubmit() {
   loading.value = true;
 
   try {
-    const response = await fetch("http://localhost:8000/api/auth/register/", {
+    const response = await fetch(apiUrl("/api/auth/register/"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",

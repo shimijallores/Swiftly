@@ -305,6 +305,7 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import FileExplorer from "./FileExplorer.vue";
 import VersionHistory from "./VersionHistory.vue";
+import { apiUrl, wsUrl } from "@/lib/api";
 
 const props = defineProps({
   user: {
@@ -474,7 +475,7 @@ function saveFileContent() {
 
   const content = editor.getValue();
 
-  fetch(`http://localhost:8000/api/files/${currentFile.value.id}/`, {
+  fetch(apiUrl(`/api/files/${currentFile.value.id}/`), {
     method: "PUT",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -517,15 +518,12 @@ async function createAutoSnapshot() {
   if (!content.trim()) return; // Don't snapshot empty files
 
   try {
-    await fetch(
-      `http://localhost:8000/api/files/${currentFile.value.id}/auto-snapshot/`,
-      {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
-      }
-    );
+    await fetch(apiUrl(`/api/files/${currentFile.value.id}/auto-snapshot/`), {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
     console.log("Auto-snapshot created");
     // Refresh version history if it's open
     if (showVersionHistory.value && versionHistoryRef.value) {
@@ -598,7 +596,7 @@ async function resolveLinkedFiles(htmlContent) {
 async function getAllProjectFiles() {
   try {
     const response = await fetch(
-      `http://localhost:8000/api/files/?room_id=${props.room.id}`,
+      apiUrl(`/api/files/?room_id=${props.room.id}`),
       { credentials: "include" }
     );
     if (!response.ok) return [];
@@ -628,10 +626,9 @@ async function getAllProjectFiles() {
 // Fetch file content by ID
 async function fetchFileContent(fileId) {
   try {
-    const response = await fetch(
-      `http://localhost:8000/api/files/content/?id=${fileId}`,
-      { credentials: "include" }
-    );
+    const response = await fetch(apiUrl(`/api/files/content/?id=${fileId}`), {
+      credentials: "include",
+    });
     if (!response.ok) return null;
     const data = await response.json();
     return data.content;
@@ -1202,7 +1199,7 @@ onMounted(() => {
 function connectWebSocket() {
   // Connect to room-specific WebSocket
   const roomId = props.room.id;
-  ws = new WebSocket(`ws://localhost:8000/ws/collab/${roomId}/`);
+  ws = new WebSocket(wsUrl(`/ws/collab/${roomId}/`));
 
   ws.onopen = () => {
     console.log(`WebSocket connected to room ${roomId}`);

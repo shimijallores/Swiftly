@@ -64,8 +64,9 @@ pip install django channels daphne django-cors-headers
 # Run migrations
 python manage.py migrate
 
-# Start server
-python manage.py runserver  # http://localhost:8000
+# Start server (use 0.0.0.0 for LAN access)
+python manage.py runserver              # localhost only
+python manage.py runserver 0.0.0.0:8000 # LAN access
 ```
 
 ### 2. Frontend Setup
@@ -83,6 +84,32 @@ npm run dev  # http://localhost:5173
 ### 3. Open App
 
 Visit **http://localhost:5173** — Register, create a room, and start coding!
+
+### 4. LAN Access (Multiple Devices)
+
+To collaborate from other computers/phones on the same network:
+
+1. Start backend with LAN binding:
+
+   ```bash
+   python manage.py runserver 0.0.0.0:8000
+   ```
+
+2. Start frontend (automatically binds to all interfaces):
+
+   ```bash
+   npm run dev
+   ```
+
+3. Find your computer's IP address:
+
+   ```powershell
+   ipconfig  # Windows - look for IPv4 Address
+   ```
+
+4. Access from other devices using: `http://<your-ip>:5173`
+
+**Note:** You may need to allow ports 5173 and 8000 through your firewall.
 
 ---
 
