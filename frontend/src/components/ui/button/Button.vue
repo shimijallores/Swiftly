@@ -1,6 +1,6 @@
 <script setup>
 import { Primitive } from "reka-ui";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/utils";
 import { buttonVariants } from ".";
 
 const props = defineProps({
@@ -17,8 +17,7 @@ const props = defineProps({
     data-slot="button"
     :as="as"
     :as-child="asChild"
-    :class="cn(buttonVariants({ variant, size }), props.class)"
-  >
+    :class="cn(buttonVariants({ variant, size }), props.class)">
     <slot />
   </Primitive>
 </template>

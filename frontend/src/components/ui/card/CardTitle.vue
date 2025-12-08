@@ -1,5 +1,5 @@
 <script setup>
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/utils";
 
 const props = defineProps({
   class: { type: null, required: false },
@@ -9,8 +9,7 @@ const props = defineProps({
 <template>
   <h3
     data-slot="card-title"
-    :class="cn('leading-none font-semibold', props.class)"
-  >
+    :class="cn('leading-none font-semibold', props.class)">
     <slot />
   </h3>
 </template>

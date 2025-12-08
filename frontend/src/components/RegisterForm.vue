@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { apiUrl } from "@/lib/api";
+import { apiUrl } from "@/utils/api";
 
 const emit = defineEmits(["register", "switchToLogin"]);
 

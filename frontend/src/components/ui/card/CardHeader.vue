@@ -1,5 +1,5 @@
 <script setup>
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/utils";
 
 const props = defineProps({
   class: { type: null, required: false },
@@ -12,10 +12,9 @@ const props = defineProps({
     :class="
       cn(
         '@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-1.5 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6',
-        props.class,
+        props.class
       )
-    "
-  >
+    ">
     <slot />
   </div>
 </template>

@@ -119,7 +119,7 @@
 <script setup>
 import { ref, onMounted, nextTick, watch } from "vue";
 import FileTreeNode from "./FileTreeNode.vue";
-import { apiUrl } from "@/lib/api";
+import { apiUrl } from "@/utils/api";
 
 const props = defineProps({
   roomId: {

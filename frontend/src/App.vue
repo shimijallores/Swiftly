@@ -5,7 +5,7 @@ import AuthPage from "./components/AuthPage.vue";
 import Navbar from "./components/Navbar.vue";
 import HomePage from "./components/HomePage.vue";
 import RoomsPage from "./components/RoomsPage.vue";
-import { apiUrl } from "@/lib/api";
+import { apiUrl } from "@/utils/api";
 
 const user = ref(null);
 const loading = ref(true);

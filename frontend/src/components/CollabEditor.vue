@@ -305,7 +305,7 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import FileExplorer from "./FileExplorer.vue";
 import VersionHistory from "./VersionHistory.vue";
-import { apiUrl, wsUrl } from "@/lib/api";
+import { apiUrl, wsUrl } from "@/utils/api";
 
 const props = defineProps({
   user: {

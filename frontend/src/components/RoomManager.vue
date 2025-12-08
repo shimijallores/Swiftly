@@ -21,7 +21,7 @@ import {
   DialogContent,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { apiUrl } from "@/lib/api";
+import { apiUrl } from "@/utils/api";
 
 const emit = defineEmits(["select-room", "logout"]);
 

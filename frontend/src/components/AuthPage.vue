@@ -3,7 +3,7 @@ import { ref } from "vue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { apiUrl } from "@/lib/api";
+import { apiUrl } from "@/utils/api";
 
 const emit = defineEmits(["login", "register", "home"]);
 

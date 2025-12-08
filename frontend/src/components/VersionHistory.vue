@@ -233,7 +233,7 @@
 
 <script setup>
 import { ref, computed, watch } from "vue";
-import { apiUrl } from "@/lib/api";
+import { apiUrl } from "@/utils/api";
 
 const props = defineProps({
   currentFile: {
