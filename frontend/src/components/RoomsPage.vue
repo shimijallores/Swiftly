@@ -236,7 +236,7 @@ const roleOptions = [
         <div class="flex gap-2">
           <Button
             variant="outline"
-            class="border-white/10 text-gray-300 hover:bg-white/5"
+            class="border-white/10 text-black hover:bg-neutral-400"
             @click="showJoinDialog = true">
             Join Room
           </Button>
@@ -416,20 +416,22 @@ const roleOptions = [
       <DialogContent>
         <form @submit.prevent="createRoom" class="space-y-4">
           <div class="space-y-2">
-            <Label for="create-name">Room Name</Label>
+            <Label for="create-name" class="text-white">Room Name</Label>
             <Input
               id="create-name"
               v-model="createForm.name"
               placeholder="My Project"
+              class="text-white"
               required />
           </div>
           <div class="space-y-2">
-            <Label for="create-password">Password</Label>
+            <Label for="create-password" class="text-white">Password</Label>
             <Input
               id="create-password"
               v-model="createForm.password"
               type="password"
               placeholder="••••••••"
+              class="text-white"
               required />
             <p class="text-xs text-gray-500">Others will need this to join</p>
           </div>
@@ -439,7 +441,10 @@ const roleOptions = [
         </form>
       </DialogContent>
       <DialogFooter>
-        <Button variant="ghost" @click="showCreateDialog = false"
+        <Button
+          variant="ghost"
+          class="bg-red-500 text-white"
+          @click="showCreateDialog = false"
           >Cancel</Button
         >
         <Button :disabled="formLoading" @click="createRoom">
@@ -459,21 +464,22 @@ const roleOptions = [
       <DialogContent>
         <form @submit.prevent="joinRoom" class="space-y-4">
           <div class="space-y-2">
-            <Label for="join-code">Room Code</Label>
+            <Label for="join-code" class="text-white">Room Code</Label>
             <Input
               id="join-code"
               v-model="joinForm.code"
               placeholder="ABC12345"
-              class="font-mono uppercase"
+              class="font-mono uppercase text-white"
               required />
           </div>
           <div class="space-y-2">
-            <Label for="join-password">Password</Label>
+            <Label for="join-password" class="text-white">Password</Label>
             <Input
               id="join-password"
               v-model="joinForm.password"
               type="password"
               placeholder="••••••••"
+              class="text-white"
               required />
           </div>
           <div v-if="formError" class="text-red-400 text-sm">
@@ -482,7 +488,12 @@ const roleOptions = [
         </form>
       </DialogContent>
       <DialogFooter>
-        <Button variant="ghost" @click="showJoinDialog = false">Cancel</Button>
+        <Button
+          variant="ghost"
+          class="bg-red-500 text-white"
+          @click="showJoinDialog = false"
+          >Cancel</Button
+        >
         <Button :disabled="formLoading" @click="joinRoom">
           {{ formLoading ? "Joining..." : "Join" }}
         </Button>
