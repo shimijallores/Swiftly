@@ -218,7 +218,17 @@ function selectRoom(room) {
 }
 
 function copyCode(code) {
-  navigator.clipboard.writeText(code);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code);
+  } else {
+    // Fallback for non-secure contexts
+    const textArea = document.createElement("textarea");
+    textArea.value = code;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textArea);
+  }
 }
 
 const roleOptions = [

@@ -752,10 +752,21 @@ function refreshPreview() {
 // Copy room code to clipboard
 async function copyRoomCode() {
   try {
-    await navigator.clipboard.writeText(props.room.code);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(props.room.code);
+    } else {
+      // Fallback for non-secure contexts
+      const textArea = document.createElement("textarea");
+      textArea.value = props.room.code;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+    }
     // Could add a toast notification here
   } catch (error) {
     console.error("Failed to copy room code:", error);
+    alert("Failed to copy room code. Please copy manually: " + props.room.code);
   }
 }
 
