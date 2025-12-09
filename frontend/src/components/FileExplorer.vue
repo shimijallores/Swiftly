@@ -41,6 +41,22 @@
           </svg>
         </button>
         <button
+          @click="$refs.fileInput.click()"
+          class="p-1.5 hover:bg-white/5 rounded-md text-white/40 hover:text-white/70 transition-colors"
+          title="Upload File">
+          <svg
+            class="w-3.5 h-3.5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+        </button>
+        <button
           @click="fetchFileTree"
           class="p-1.5 hover:bg-white/5 rounded-md text-white/40 hover:text-white/70 transition-colors"
           title="Refresh">
@@ -75,6 +91,14 @@
         </svg>
       </button>
     </div>
+
+    <!-- Hidden file input for uploads -->
+    <input
+      ref="fileInput"
+      type="file"
+      @change="handleFileUpload"
+      class="hidden"
+      multiple />
 
     <!-- New file/folder input at root level -->
     <div
@@ -144,6 +168,7 @@ const showNewFileInput = ref(false);
 const showNewFolderInput = ref(false);
 const newItemName = ref("");
 const newItemInput = ref(null);
+const fileInput = ref(null);
 
 // Focus input when shown
 watch([showNewFileInput, showNewFolderInput], () => {
@@ -311,6 +336,39 @@ async function handleDelete({ id }) {
     console.error("Error deleting:", e);
     alert(e.message);
   }
+}
+
+async function handleFileUpload(event) {
+  const files = event.target.files;
+  if (!files.length) return;
+
+  for (const file of files) {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('room_id', props.roomId);
+      // Upload to root for now, could be extended to support parentId
+
+      const response = await fetch(apiUrl("/api/files/upload/"), {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to upload");
+      }
+    } catch (e) {
+      console.error("Error uploading file:", e);
+      alert(`Failed to upload ${file.name}: ${e.message}`);
+    }
+  }
+
+  // Clear the input
+  event.target.value = '';
+  await fetchFileTree();
+  emit("file-change");
 }
 
 onMounted(() => {

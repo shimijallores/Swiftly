@@ -263,6 +263,50 @@ def file_create_view(request):
 
 
 @csrf_exempt
+@require_http_methods(["POST"])
+def file_upload_view(request):
+    """
+    Upload a file from the user's browser.
+    POST: multipart/form-data with 'file' field, and 'room_id', 'parentId' (optional)
+    """
+    try:
+        room_id = request.POST.get('room_id', 'default')
+        parent_id = request.POST.get('parentId')
+        uploaded_file = request.FILES.get('file')
+        
+        if not uploaded_file:
+            return JsonResponse({'error': 'No file provided'}, status=400)
+        
+        name = uploaded_file.name
+        if not name:
+            return JsonResponse({'error': 'File name is required'}, status=400)
+        
+        # Read file content
+        content = uploaded_file.read().decode('utf-8', errors='replace')
+        
+        parent = None
+        if parent_id:
+            try:
+                parent = VirtualFile.objects.get(id=parent_id, type=VirtualFile.FOLDER)
+            except VirtualFile.DoesNotExist:
+                return JsonResponse({'error': 'Parent folder not found'}, status=404)
+        
+        file = VirtualFile.objects.create(
+            room_id=room_id,
+            name=name,
+            type=VirtualFile.FILE,
+            parent=parent,
+            content=content,
+        )
+        
+        return JsonResponse(file.to_dict(), status=201)
+    except IntegrityError:
+        return JsonResponse({'error': 'A file with this name already exists in this location'}, status=409)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
 @require_http_methods(["PUT"])
 def file_update_view(request, file_id):
     """
