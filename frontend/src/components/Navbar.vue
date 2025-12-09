@@ -64,7 +64,13 @@ const userColor = computed(() => {
               Rooms
             </button>
             <button
-              class="px-3 py-1.5 text-sm rounded-md text-gray-500 cursor-not-allowed">
+              @click="emit('navigate', 'templates')"
+              class="px-3 py-1.5 text-sm rounded-md transition-colors"
+              :class="
+                currentPage === 'templates'
+                  ? 'text-white bg-white/10'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+              ">
               Templates
             </button>
           </div>

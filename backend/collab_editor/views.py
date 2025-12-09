@@ -435,6 +435,7 @@ def rooms_view(request):
             data = json.loads(request.body)
             name = data.get('name')
             password = data.get('password')
+            template = data.get('template')
             
             if not name or not password:
                 return JsonResponse({'error': 'Name and password are required'}, status=400)
@@ -457,8 +458,11 @@ def rooms_view(request):
                 role=RoomMember.OWNER,
             )
             
-            # Create default file structure for this room
-            VirtualFile.create_default_structure(str(room.id))
+            # Create file structure based on template
+            if template:
+                VirtualFile.create_template_structure(str(room.id), template)
+            else:
+                VirtualFile.create_default_structure(str(room.id))
             
             room_data = room.to_dict(include_members=True)
             room_data['userRole'] = RoomMember.OWNER

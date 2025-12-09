@@ -128,6 +128,157 @@ class VirtualFile(models.Model):
             content='# My Project\n\nWelcome to swiftly!\n'
         )
 
+    @classmethod
+    def create_template_structure(cls, room_id, template):
+        """Create a template-based project structure for a new room."""
+        # Check if room already has files
+        if cls.objects.filter(room_id=room_id).exists():
+            return
+
+        if template == 'vue':
+            # Create Vue.js template structure
+            cls.objects.create(
+                room_id=room_id,
+                name='index.html',
+                type=cls.FILE,
+                content="""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vue.js App</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body>
+    <div id="app">
+        <div class="min-h-screen bg-gray-100 py-8">
+            <div class="max-w-4xl mx-auto px-4">
+                <header class="text-center mb-8">
+                    <h1 class="text-4xl font-bold text-gray-800 mb-2">{{ title }}</h1>
+                    <p class="text-gray-600">{{ message }}</p>
+                </header>
+
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h2 class="text-2xl font-semibold mb-4">Counter: {{ count }}</h2>
+                    <div class="flex gap-4">
+                        <button
+                            @click="increment"
+                            class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                            Increment
+                        </button>
+                        <button
+                            @click="decrement"
+                            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">
+                            Decrement
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-2xl font-semibold mb-4">Todo List</h2>
+                    <div class="mb-4">
+                        <input
+                            v-model="newTodo"
+                            @keyup.enter="addTodo"
+                            placeholder="Add a new todo..."
+                            class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <ul class="space-y-2">
+                        <li
+                            v-for="(todo, index) in todos"
+                            :key="index"
+                            class="flex items-center gap-3 p-2 bg-gray-50 rounded">
+                            <input
+                                type="checkbox"
+                                v-model="todo.completed"
+                                class="w-4 h-4 text-blue-600">
+                            <span :class="{ 'line-through text-gray-500': todo.completed }">
+                                {{ todo.text }}
+                            </span>
+                            <button
+                                @click="removeTodo(index)"
+                                class="ml-auto text-red-500 hover:text-red-700">
+                                ✕
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    title: 'Welcome to Vue.js!',
+                    message: 'This is a simple Vue.js application with CDN.',
+                    count: 0,
+                    newTodo: '',
+                    todos: [
+                        { text: 'Learn Vue.js', completed: false },
+                        { text: 'Build something awesome', completed: false }
+                    ]
+                }
+            },
+            methods: {
+                increment() {
+                    this.count++;
+                },
+                decrement() {
+                    this.count--;
+                },
+                addTodo() {
+                    if (this.newTodo.trim()) {
+                        this.todos.push({
+                            text: this.newTodo.trim(),
+                            completed: false
+                        });
+                        this.newTodo = '';
+                    }
+                },
+                removeTodo(index) {
+                    this.todos.splice(index, 1);
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>"""
+            )
+
+            cls.objects.create(
+                room_id=room_id,
+                name='README.md',
+                type=cls.FILE,
+                content="""# Vue.js Template
+
+This is a Vue.js application created with Swiftly.
+
+## Features
+
+- Vue 3 with CDN
+- Counter component
+- Todo list functionality
+- Responsive design with Tailwind CSS
+
+## Getting Started
+
+1. Open `index.html` in your browser
+2. Start coding collaboratively!
+
+## Vue.js Documentation
+
+- [Vue.js Guide](https://vuejs.org/guide/introduction.html)
+- [Vue 3 Composition API](https://vuejs.org/guide/extras/composition-api-faq.html)
+"""
+            )
+        else:
+            # Fallback to default structure
+            cls.create_default_structure(room_id)
+
 
 class CollabUser(models.Model):
     """

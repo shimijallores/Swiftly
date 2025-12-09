@@ -5,6 +5,7 @@ import AuthPage from "./components/AuthPage.vue";
 import Navbar from "./components/Navbar.vue";
 import HomePage from "./components/HomePage.vue";
 import RoomsPage from "./components/RoomsPage.vue";
+import TemplatesPage from "./components/TemplatesPage.vue";
 import { apiUrl } from "@/utils/api";
 
 const user = ref(null);
@@ -125,6 +126,10 @@ onMounted(() => {
 
       <RoomsPage
         v-else-if="currentPage === 'rooms' && user"
+        @select-room="handleSelectRoom" />
+
+      <TemplatesPage
+        v-else-if="currentPage === 'templates' && user"
         @select-room="handleSelectRoom" />
     </div>
   </template>
